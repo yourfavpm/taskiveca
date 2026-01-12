@@ -20,8 +20,8 @@ export const metadata: Metadata = {
     type: "website",
   },
   icons: {
-    icon: '/favicon.ico', // Standard favicon
-    shortcut: '/favicon.ico',
+    icon: '/logooo.png', // Standard favicon
+    shortcut: '/logooo.png',
     apple: '/logo.png', // Fallback to logo for apple touch icon if strict apple-touch-icon.png not found
   },
 };

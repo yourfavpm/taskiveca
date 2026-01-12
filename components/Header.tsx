@@ -20,7 +20,7 @@ export default function Header() {
         <nav className="nav">
           <Link href="/" className="logo-link">
             <Image
-              src="/logo.png"
+              src="/logooo.png"
               alt="Taskive Tech"
               width={140}
               height={40}
