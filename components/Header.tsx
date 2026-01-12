@@ -106,6 +106,7 @@ export default function Header() {
           height: 40px;
           width: auto;
           object-fit: contain;
+          mix-blend-mode: multiply; /* Makes white background transparent */
         }
 
         .nav-links {
