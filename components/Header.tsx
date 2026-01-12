@@ -1,76 +1,84 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { useState } from 'react'
 
 export default function Header() {
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-    const navLinks = [
-        { href: '/#capabilities', label: 'Services' },
-        { href: '/#work', label: 'Work' },
-        { href: '/#pricing', label: 'Pricing' },
-        { href: '/book-consultation', label: 'Contact' },
-    ]
+  const navLinks = [
+    { href: '/#capabilities', label: 'Services' },
+    { href: '/#work', label: 'Work' },
+    { href: '/#pricing', label: 'Pricing' },
+    { href: '/book-consultation', label: 'Contact' },
+  ]
 
-    return (
-        <header className="header">
-            <div className="container">
-                <nav className="nav">
-                    <Link href="/" className="logo">
-                        Taskive Tech
-                    </Link>
+  return (
+    <header className="header">
+      <div className="container">
+        <nav className="nav">
+          <Link href="/" className="logo-link">
+            <Image
+              src="/logo.png"
+              alt="Taskive Tech"
+              width={140}
+              height={40}
+              priority
+              className="logo-image"
+            />
+          </Link>
 
-                    {/* Desktop Navigation */}
-                    <div className="nav-links">
-                        {navLinks.map((link) => (
-                            <Link key={link.href} href={link.href} className="nav-link">
-                                {link.label}
-                            </Link>
-                        ))}
-                    </div>
+          {/* Desktop Navigation */}
+          <div className="nav-links">
+            {navLinks.map((link) => (
+              <Link key={link.href} href={link.href} className="nav-link">
+                {link.label}
+              </Link>
+            ))}
+          </div>
 
-                    <div className="nav-actions">
-                        <Link href="/book-consultation" className="btn btn-primary">
-                            Start a Project
-                        </Link>
-                    </div>
+          <div className="nav-actions">
+            <Link href="/book-consultation" className="btn btn-primary">
+              Start a Project
+            </Link>
+          </div>
 
-                    {/* Mobile Menu Button */}
-                    <button
-                        className="mobile-menu-btn"
-                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                        aria-label="Toggle menu"
-                    >
-                        <span className={`hamburger ${mobileMenuOpen ? 'open' : ''}`}></span>
-                    </button>
-                </nav>
+          {/* Mobile Menu Button */}
+          <button
+            className="mobile-menu-btn"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            <span className={`hamburger ${mobileMenuOpen ? 'open' : ''}`}></span>
+          </button>
+        </nav>
 
-                {/* Mobile Navigation */}
-                {mobileMenuOpen && (
-                    <div className="mobile-nav">
-                        {navLinks.map((link) => (
-                            <Link
-                                key={link.href}
-                                href={link.href}
-                                className="mobile-nav-link"
-                                onClick={() => setMobileMenuOpen(false)}
-                            >
-                                {link.label}
-                            </Link>
-                        ))}
-                        <Link
-                            href="/book-consultation"
-                            className="btn btn-primary"
-                            onClick={() => setMobileMenuOpen(false)}
-                        >
-                            Start a Project
-                        </Link>
-                    </div>
-                )}
-            </div>
+        {/* Mobile Navigation */}
+        {mobileMenuOpen && (
+          <div className="mobile-nav">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="mobile-nav-link"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <Link
+              href="/book-consultation"
+              className="btn btn-primary"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Start a Project
+            </Link>
+          </div>
+        )}
+      </div>
 
-            <style jsx>{`
+      <style jsx>{`
         .header {
           position: fixed;
           top: 0;
@@ -89,15 +97,15 @@ export default function Header() {
           height: 72px;
         }
 
-        .logo {
-          font-size: 20px;
-          font-weight: 600;
-          color: var(--color-text-primary);
-          letter-spacing: -0.02em;
+        .logo-link {
+          display: flex;
+          align-items: center;
         }
 
-        .logo:hover {
-          color: var(--color-text-primary);
+        .logo-image {
+          height: 40px;
+          width: auto;
+          object-fit: contain;
         }
 
         .nav-links {
@@ -200,6 +208,6 @@ export default function Header() {
           }
         }
       `}</style>
-        </header>
-    )
+    </header>
+  )
 }

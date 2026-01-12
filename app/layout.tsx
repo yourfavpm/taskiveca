@@ -19,6 +19,11 @@ export const metadata: Metadata = {
     description: "A studio-led product and engineering team building websites, platforms, and scalable systems.",
     type: "website",
   },
+  icons: {
+    icon: '/favicon.ico', // Standard favicon
+    shortcut: '/favicon.ico',
+    apple: '/logo.png', // Fallback to logo for apple touch icon if strict apple-touch-icon.png not found
+  },
 };
 
 export default function RootLayout({
