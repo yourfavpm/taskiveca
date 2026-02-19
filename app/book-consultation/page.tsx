@@ -41,9 +41,9 @@ export default function BookConsultation() {
       if (submitError) throw submitError
 
       setSubmitted(true)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting consultation:', err)
-      setError('There was an error submitting your request. Please try again or email us directly.')
+      setError(err.message || 'There was an error submitting your request. Please try again or email us directly.')
     } finally {
       setIsSubmitting(false)
     }
@@ -234,7 +234,10 @@ export default function BookConsultation() {
 
           {error && (
             <div className="error-message">
-              {error}
+              <strong>Error submitting request:</strong> {error}
+              <p style={{ marginTop: '8px', fontSize: '13px' }}>
+                If this persists, please contact us at <a href="mailto:taskive.dev@gmail.com">taskive.dev@gmail.com</a>
+              </p>
             </div>
           )}
 

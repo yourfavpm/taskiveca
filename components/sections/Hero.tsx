@@ -47,7 +47,7 @@ export default function Hero() {
       setSubmitted(true)
     } catch (err: any) {
       console.error('Unexpected error submitting consultation:', err)
-      setError('Error submitting request. Please try again.')
+      setError(`Error: ${err.message || 'Unknown network error. Please check your connection.'}`)
     } finally {
       setIsSubmitting(false)
     }
