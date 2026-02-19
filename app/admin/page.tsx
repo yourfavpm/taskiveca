@@ -2,12 +2,12 @@
 
 export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import type { Consultation, CaseStudy, CompanySettings } from '@/lib/types'
+import type { User } from '@supabase/supabase-js'
 
-// Admin Components
+import type { Consultation, CaseStudy, CompanySettings } from '@/lib/types'
 import Sidebar from '@/components/admin/Sidebar'
 import DashboardStats from '@/components/admin/DashboardStats'
 import ConsultationManager from '@/components/admin/ConsultationManager'
@@ -23,7 +23,7 @@ import AnalyticsDashboard from '@/components/admin/Analytics/AnalyticsDashboard'
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
 
   // Data States
   const [consultations, setConsultations] = useState<Consultation[]>([])
@@ -52,8 +52,8 @@ export default function AdminDashboard() {
     if (data) {
       setConsultations(data)
       const total = data.length
-      const newCount = data.filter((c: any) => c.status === 'new').length
-      const completed = data.filter((c: any) => c.status === 'completed').length
+      const newCount = data.filter((c: Consultation) => c.status === 'new').length
+      const completed = data.filter((c: Consultation) => c.status === 'completed').length
       const conversionRate = total > 0 ? Math.round((completed / total) * 100) : 0
       setStats({ total, new: newCount, completed, conversionRate })
     }
@@ -69,7 +69,7 @@ export default function AdminDashboard() {
     if (data) setCompanySettings(data)
   }
 
-  const checkUser = async () => {
+  const checkUser = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || user.email !== 'info@taskivetech.tech') {
       router.push('/admin/login')
@@ -82,11 +82,12 @@ export default function AdminDashboard() {
       fetchSettings()
     ])
     setLoading(false)
-  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     checkUser()
-  }, [])
+  }, [checkUser])
 
   const fetchNotes = async (consultationId: string) => {
     const { data } = await supabase

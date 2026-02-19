@@ -59,14 +59,14 @@ export default function Testimonials() {
                     <small className="section-eyebrow">Social Proof</small>
                     <h2>Voices from our Clients</h2>
                     <p className="section-subtitle mx-auto">
-                        We've partnered with forward-thinking brands to build products that matter.
+                        We&apos;ve partnered with forward-thinking brands to build products that matter.
                     </p>
                 </div>
 
                 <div className="testimonials-grid">
                     {testimonials.map((testimonial, index) => (
                         <div key={index} className="testimonial-card">
-                            <div className="quote-icon">"</div>
+                            <div className="quote-icon">&ldquo;</div>
                             <p className="testimonial-quote">{testimonial.quote}</p>
                             <div className="testimonial-footer">
                                 <div className="testimonial-avatar">{testimonial.avatar}</div>
