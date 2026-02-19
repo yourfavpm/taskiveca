@@ -41,18 +41,19 @@ export default function AdminDashboard() {
   const router = useRouter()
   const supabase = createClient()
 
-  useEffect(() => {
-    checkUser()
-  }, [])
-
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user || user.email !== 'taskive.dev@gmail.com') {
+    if (!user || user.email !== 'info@taskivetech.tech') {
       router.push('/admin/login')
       return
     }
-    setUser(user)
-    await Promise.all([
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    checkUser()
+  }, [])
+  await Promise.all([
       fetchConsultations(),
       fetchCaseStudies(),
       fetchSettings()

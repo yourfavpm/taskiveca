@@ -236,7 +236,7 @@ export default function BookConsultation() {
             <div className="error-message">
               <strong>Error submitting request:</strong> {error}
               <p style={{ marginTop: '8px', fontSize: '13px' }}>
-                If this persists, please contact us at <a href="mailto:taskive.dev@gmail.com">taskive.dev@gmail.com</a>
+                If this persists, please contact us at <a href="mailto:info@taskivetech.tech">info@taskivetech.tech</a>
               </p>
             </div>
           )}

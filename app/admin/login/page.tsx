@@ -22,7 +22,7 @@ export default function AdminLogin() {
     setError('')
 
     try {
-      if (email !== 'taskive.dev@gmail.com') {
+      if (email !== 'info@taskivetech.tech') {
         throw new Error('Access denied. This area is restricted to authorized personnel.')
       }
 

@@ -32,5 +32,5 @@ CREATE POLICY "Anyone can view active testimonials" ON testimonials
 DROP POLICY IF EXISTS "Only admin can manage testimonials" ON testimonials;
 CREATE POLICY "Only admin can manage testimonials" ON testimonials
     FOR ALL USING (
-        auth.jwt() ->> 'email' = 'taskive.dev@gmail.com'
+        auth.jwt() ->> 'email' = 'info@taskivetech.tech'
     );

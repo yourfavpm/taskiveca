@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS company_settings (
 
 -- Initialize with default/empty values if not exists
 INSERT INTO company_settings (contact_email, contact_phone, address, social_tiktok, social_instagram)
-VALUES ('taskive.dev@gmail.com', '', '', '', '')
+VALUES ('info@taskivetech.tech', '', '', '', '')
 ON CONFLICT (is_singleton) DO NOTHING;
 
 -- 3. Security: Admin Check Function
@@ -28,7 +28,7 @@ ON CONFLICT (is_singleton) DO NOTHING;
 CREATE OR REPLACE FUNCTION is_admin()
 RETURNS BOOLEAN AS $$
 BEGIN
-  RETURN auth.jwt() ->> 'email' = 'taskive.dev@gmail.com';
+  RETURN auth.jwt() ->> 'email' = 'info@taskivetech.tech';
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
