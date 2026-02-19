@@ -3,19 +3,18 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PROJECT_TYPES } from '@/lib/types'
-import type { Metadata } from 'next'
+import CalendlyWidget from '@/components/CalendlyWidget'
+import Link from 'next/link'
 
 export default function BookConsultation() {
   const [formState, setFormState] = useState({
     name: '',
     email: '',
     company: '',
-    country: '',
+    country: 'Canada',
     project_type: '',
     estimated_start_time: '',
     description: '',
-    preferred_date: '',
-    preferred_time: '',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -57,10 +56,13 @@ export default function BookConsultation() {
           <div className="success-message">
             <div className="success-icon">✓</div>
             <h1>Thank you!</h1>
-            <p>We've received your consultation request. We'll be in touch within 1-2 business days.</p>
-            <a href="/" className="btn btn-secondary">
+            <p>We&apos;ve received your request. To finalize your consultation, please pick a time that works for you below:</p>
+            <div className="calendly-wrapper">
+              <CalendlyWidget prefill={{ name: formState.name, email: formState.email }} />
+            </div>
+            <Link href="/" className="btn btn-secondary">
               Back to Home
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -103,6 +105,14 @@ export default function BookConsultation() {
             color: var(--color-text-secondary);
             margin-bottom: 32px;
           }
+
+          .calendly-wrapper {
+            margin-bottom: 40px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+          }
         `}</style>
       </div>
     )
@@ -113,7 +123,7 @@ export default function BookConsultation() {
       <div className="container">
         <div className="page-header">
           <h1>Book a Consultation</h1>
-          <p>Tell us about your project. We'll get back to you within 1-2 business days.</p>
+          <p>Tell us about your project. We&apos;ll get back to you within 1-2 business days.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="consultation-form">
@@ -144,34 +154,6 @@ export default function BookConsultation() {
               />
             </div>
 
-            <div className="form-group">
-              <label htmlFor="preferred_date" className="form-label">Preferred Date</label>
-              <input
-                type="date"
-                id="preferred_date"
-                name="preferred_date"
-                className="form-input"
-                value={formState.preferred_date || ''}
-                onChange={handleChange}
-                min={new Date().toISOString().split('T')[0]}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="preferred_time" className="form-label">Preferred Time</label>
-              <select
-                id="preferred_time"
-                name="preferred_time"
-                className="form-select"
-                value={formState.preferred_time || ''}
-                onChange={handleChange}
-              >
-                <option value="">Select a time</option>
-                <option value="Morning (9AM - 12PM)">Morning (9AM - 12PM)</option>
-                <option value="Afternoon (12PM - 4PM)">Afternoon (12PM - 4PM)</option>
-                <option value="Evening (4PM - 6PM)">Evening (4PM - 6PM)</option>
-              </select>
-            </div>
 
             <div className="form-group">
               <label htmlFor="company" className="form-label">Company (optional)</label>

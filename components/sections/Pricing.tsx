@@ -75,7 +75,7 @@ export default function Pricing() {
 
         <div className="pricing-note">
           <p>
-            <strong>Note on Pricing:</strong> Final cost is determined by project scope, technical complexity, and specific feature requirements.
+            <strong>Note on Pricing:</strong> Prices are in CAD unless otherwise specified. Final cost is determined by project scope, technical complexity, and specific feature requirements.
             We provide a detailed custom quote following a thorough discovery call to ensure our proposal aligns perfectly with your goals.
           </p>
         </div>

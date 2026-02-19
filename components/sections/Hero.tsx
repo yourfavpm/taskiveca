@@ -4,17 +4,16 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { PROJECT_TYPES } from '@/lib/types'
+import CalendlyWidget from '@/components/CalendlyWidget'
 
 export default function Hero() {
   const [formState, setFormState] = useState({
     name: '',
     email: '',
     company: '',
-    country: '',
+    country: 'Canada',
     project_type: '',
     estimated_start_time: '',
-    preferred_date: '',
-    preferred_time: '',
     description: '',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -63,7 +62,7 @@ export default function Hero() {
               We design and build digital products that work.
             </h1>
             <p className="hero-subtitle">
-              Taskive Tech is a studio-led product and engineering team building websites, platforms, and scalable systems.
+              Taskive Tech is a Canadian studio-led product and engineering team building websites, platforms, and scalable systems.
             </p>
             <div className="hero-actions">
               <Link href="/#work" className="btn btn-secondary">
@@ -78,8 +77,11 @@ export default function Hero() {
                 <div className="success-state">
                   <div className="success-icon">✓</div>
                   <h3>Request Received!</h3>
-                  <p>We'll be in touch within 24 hours to schedule your consultation.</p>
-                  <button onClick={() => setSubmitted(false)} className="btn btn-secondary btn-sm">Sent another request</button>
+                  <p>Thanks for your interest. To finalize your consultation, please pick a time that works for you below:</p>
+                  <div className="calendly-wrapper">
+                    <CalendlyWidget prefill={{ name: formState.name, email: formState.email }} />
+                  </div>
+                  <button onClick={() => setSubmitted(false)} className="btn btn-secondary btn-sm mt-4">Send another request</button>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="hero-form">
@@ -169,31 +171,6 @@ export default function Hero() {
                     </div>
                   </div>
 
-                  <div className="form-grid">
-                    <div className="form-group">
-                      <input
-                        type="date"
-                        name="preferred_date"
-                        className="form-input"
-                        value={formState.preferred_date}
-                        onChange={handleChange}
-                        min={new Date().toISOString().split('T')[0]}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <select
-                        name="preferred_time"
-                        className="form-select"
-                        value={formState.preferred_time}
-                        onChange={handleChange}
-                      >
-                        <option value="">Pref. Time</option>
-                        <option value="Morning (9AM - 12PM)">Morning</option>
-                        <option value="Afternoon (12PM - 4PM)">Afternoon</option>
-                        <option value="Evening (4PM - 6PM)">Evening</option>
-                      </select>
-                    </div>
-                  </div>
 
                   <div className="form-group">
                     <textarea
@@ -355,6 +332,18 @@ export default function Hero() {
         .btn-sm {
           padding: 8px 16px;
           font-size: 13px;
+        }
+
+        .calendly-wrapper {
+          margin-top: 20px;
+          border-radius: 12px;
+          overflow: hidden;
+          background: #f9fafb;
+          border: 1px solid #e5e7eb;
+        }
+
+        .mt-4 {
+          margin-top: 16px;
         }
 
         @media (max-width: 1024px) {

@@ -5,6 +5,7 @@ const testimonials = [
         name: "Sarah Chen",
         role: "Founder & CEO",
         company: "TechFlow Systems",
+        location: "Toronto, ON",
         quote: "Taskive Tech didn't just build our platform; they helped us define our digital future. Their attention to detail and engineering excellence is unmatched in the industry.",
         avatar: "SC"
     },
@@ -12,6 +13,7 @@ const testimonials = [
         name: "Marcus Rodriguez",
         role: "Product Director",
         company: "Nexus Fintech",
+        location: "Vancouver, BC",
         quote: "The team's ability to navigate complex financial security requirements while maintaining a premium user experience was critical to our successful launch.",
         avatar: "MR"
     },
@@ -19,6 +21,7 @@ const testimonials = [
         name: "Elena Rossi",
         role: "Marketing Head",
         company: "Luxe Retail Group",
+        location: "Montreal, QC",
         quote: "Our new e-commerce ecosystem is a masterpiece. We saw a 40% increase in conversion within the first month of going live with Taskive.",
         avatar: "ER"
     },
@@ -26,6 +29,7 @@ const testimonials = [
         name: "David Park",
         role: "CTO",
         company: "EduSphere",
+        location: "Calgary, AB",
         quote: "The speed and quality Taskive delivers for MVPs is phenomenal. They under-promise and over-deliver every single time.",
         avatar: "DP"
     },
@@ -33,6 +37,7 @@ const testimonials = [
         name: "Amina Okafor",
         role: "Operations Lead",
         company: "Global Impact Org",
+        location: "Ottawa, ON",
         quote: "Finding a partner that understands impact as much as they understand code is rare. Taskive Tech is exactly that partner.",
         avatar: "AO"
     },
@@ -40,6 +45,7 @@ const testimonials = [
         name: "Julian Schmidt",
         role: "Lead Engineer",
         company: "MediaCore",
+        location: "Halifax, NS",
         quote: "Highly scalable, clean code, and a pleasure to collaborate with. Their team feels like an extension of our own in-house engineering squad.",
         avatar: "JS"
     }
@@ -67,6 +73,7 @@ export default function Testimonials() {
                                 <div className="testimonial-info">
                                     <h4 className="testimonial-name">{testimonial.name}</h4>
                                     <p className="testimonial-role">{testimonial.role} at {testimonial.company}</p>
+                                    <p className="testimonial-location">{testimonial.location}</p>
                                 </div>
                             </div>
                         </div>
@@ -188,6 +195,13 @@ export default function Testimonials() {
           font-size: 13px;
           color: var(--color-text-muted);
           margin: 0;
+        }
+
+        .testimonial-location {
+          font-size: 12px;
+          color: var(--color-accent);
+          font-weight: 500;
+          margin-top: 2px;
         }
 
         @media (max-width: 1024px) {
