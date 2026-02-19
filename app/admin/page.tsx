@@ -41,6 +41,34 @@ export default function AdminDashboard() {
   const router = useRouter()
   const supabase = createClient()
 
+  // --- Data Fetching ---
+
+  async function fetchConsultations() {
+    const { data } = await supabase
+      .from('consultations')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (data) {
+      setConsultations(data)
+      const total = data.length
+      const newCount = data.filter((c: any) => c.status === 'new').length
+      const completed = data.filter((c: any) => c.status === 'completed').length
+      const conversionRate = total > 0 ? Math.round((completed / total) * 100) : 0
+      setStats({ total, new: newCount, completed, conversionRate })
+    }
+  }
+
+  async function fetchCaseStudies() {
+    const { data } = await supabase.from('case_studies').select('*').order('created_at', { ascending: false })
+    if (data) setCaseStudies(data)
+  }
+
+  async function fetchSettings() {
+    const { data } = await supabase.from('company_settings').select('*').single()
+    if (data) setCompanySettings(data)
+  }
+
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || user.email !== 'info@taskivetech.tech') {
@@ -59,34 +87,6 @@ export default function AdminDashboard() {
   useEffect(() => {
     checkUser()
   }, [])
-
-  // --- Data Fetching ---
-
-  const fetchConsultations = async () => {
-    const { data } = await supabase
-      .from('consultations')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (data) {
-      setConsultations(data)
-      const total = data.length
-      const newCount = data.filter(c => c.status === 'new').length
-      const completed = data.filter(c => c.status === 'completed').length
-      const conversionRate = total > 0 ? Math.round((completed / total) * 100) : 0
-      setStats({ total, new: newCount, completed, conversionRate })
-    }
-  }
-
-  const fetchCaseStudies = async () => {
-    const { data } = await supabase.from('case_studies').select('*').order('created_at', { ascending: false })
-    if (data) setCaseStudies(data)
-  }
-
-  const fetchSettings = async () => {
-    const { data } = await supabase.from('company_settings').select('*').single()
-    if (data) setCompanySettings(data)
-  }
 
   const fetchNotes = async (consultationId: string) => {
     const { data } = await supabase
