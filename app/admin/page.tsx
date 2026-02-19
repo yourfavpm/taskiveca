@@ -47,19 +47,18 @@ export default function AdminDashboard() {
       router.push('/admin/login')
       return
     }
-    setLoading(false)
-  }
-
-  useEffect(() => {
-    checkUser()
-  }, [])
-  await Promise.all([
+    setUser(user)
+    await Promise.all([
       fetchConsultations(),
       fetchCaseStudies(),
       fetchSettings()
     ])
     setLoading(false)
   }
+
+  useEffect(() => {
+    checkUser()
+  }, [])
 
   // --- Data Fetching ---
 
