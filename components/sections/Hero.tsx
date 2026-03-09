@@ -58,6 +58,11 @@ export default function Hero() {
       <div className="container">
         <div className="hero-wrapper">
           <div className="hero-content">
+            <div className="preview-tag">
+              <span className="preview-tag-dot" />
+              <span>See your site live — before you pay a dime</span>
+              <span className="preview-tag-sparkle">✨</span>
+            </div>
             <h1 className="hero-title">
               We design and build digital products that work.
             </h1>
@@ -213,6 +218,68 @@ export default function Hero() {
         .hero-content {
           position: relative;
           z-index: 2;
+        }
+
+        .preview-tag {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 18px;
+          border-radius: 100px;
+          background: linear-gradient(135deg, rgba(37, 99, 235, 0.06), rgba(139, 92, 246, 0.06));
+          border: 1px solid rgba(37, 99, 235, 0.12);
+          font-size: 14px;
+          font-weight: 500;
+          color: #1e40af;
+          margin-bottom: 24px;
+          animation: tagFadeIn 0.8s ease-out;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .preview-tag::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+          animation: tagShimmer 3s ease-in-out infinite;
+        }
+
+        .preview-tag-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #10b981;
+          animation: tagPulse 2s ease-in-out infinite;
+          flex-shrink: 0;
+        }
+
+        .preview-tag-sparkle {
+          font-size: 14px;
+          animation: tagBounce 2s ease-in-out infinite;
+        }
+
+        @keyframes tagFadeIn {
+          from { opacity: 0; transform: translateY(-8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes tagShimmer {
+          0%, 100% { left: -100%; }
+          50% { left: 100%; }
+        }
+
+        @keyframes tagPulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        @keyframes tagBounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-2px); }
         }
 
         .hero-title {

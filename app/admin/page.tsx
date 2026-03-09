@@ -66,15 +66,46 @@ export default function AdminDashboard() {
 
   async function fetchSettings() {
     const { data } = await supabase.from('company_settings').select('*').single()
-    if (data) setCompanySettings(data)
+    if (data) {
+      setCompanySettings(data)
+    } else {
+      // Provide a default template if no settings exist yet
+      setCompanySettings({
+        id: '',
+        contact_email: '',
+        contact_phone: '',
+        address: '',
+        social_tiktok: '',
+        social_instagram: ''
+      })
+    }
   }
 
   const checkUser = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user || user.email !== 'info@taskivetech.tech') {
+    
+    if (!user) {
       router.push('/admin/login')
       return
     }
+
+    // Verify if the user is in the admins table (case-insensitive)
+    const { data: adminEntry, error: adminError } = await supabase
+      .from('admins')
+      .select('email')
+      .ilike('email', user.email || '')
+      .single()
+
+    if (adminError || !adminEntry) {
+      console.error('Admin verification failed:', {
+        error: adminError,
+        userEmail: user.email,
+        wasFound: !!adminEntry
+      })
+      router.push('/admin/login')
+      return
+    }
+
     setUser(user)
     await Promise.all([
       fetchConsultations(),
@@ -129,14 +160,22 @@ export default function AdminDashboard() {
   }
 
   const saveSettings = async (settings: CompanySettings) => {
-    await supabase.from('company_settings').update({
+    const { error } = await supabase.from('company_settings').upsert({
+      ...(settings.id ? { id: settings.id } : {}),
       contact_email: settings.contact_email,
       contact_phone: settings.contact_phone,
       address: settings.address,
       social_tiktok: settings.social_tiktok,
-      social_instagram: settings.social_instagram
-    }).eq('id', settings.id)
-    fetchSettings()
+      social_instagram: settings.social_instagram,
+      is_singleton: true, // Required for the singleton constraint
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'is_singleton' })
+
+    if (error) {
+      alert('Error saving settings: ' + error.message)
+    } else {
+      fetchSettings()
+    }
   }
 
   // --- Case Study CMS Actions ---
@@ -221,10 +260,17 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === 'settings' && companySettings && (
+        {activeTab === 'settings' && (
           <div className="view-animate">
             <SettingsForm
-              settings={companySettings}
+              settings={companySettings || {
+                id: '',
+                contact_email: '',
+                contact_phone: '',
+                address: '',
+                social_tiktok: '',
+                social_instagram: ''
+              }}
               onSave={saveSettings}
             />
           </div>

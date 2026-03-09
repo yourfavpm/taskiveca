@@ -22,10 +22,6 @@ export default function AdminLogin() {
     setError('')
 
     try {
-      if (email !== 'info@taskivetech.tech') {
-        throw new Error('Access denied. This area is restricted to authorized personnel.')
-      }
-
       const supabase = createClient()
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,

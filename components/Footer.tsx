@@ -16,7 +16,7 @@ export default function Footer() {
     const supabase = createClient()
     const { data, error } = await supabase.from('company_settings').select('*').single()
     if (error) {
-      console.error('Error fetching company settings:', error)
+      // Silently ignore — table may not exist or have no rows yet
       return
     }
     if (data) setCompanySettings(data)
