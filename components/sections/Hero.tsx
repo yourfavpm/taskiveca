@@ -18,6 +18,7 @@ export default function Hero() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [consultationId, setConsultationId] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -34,9 +35,11 @@ export default function Hero() {
 
     try {
       const supabase = createClient()
-      const { error: submitError } = await supabase
+      const { data, error: submitError } = await supabase
         .from('consultations')
         .insert([formState])
+        .select('id')
+        .single()
 
       if (submitError) {
         console.error('Supabase error submitting consultation:', submitError)
@@ -44,12 +47,35 @@ export default function Hero() {
         return
       }
 
+      if (data) {
+        setConsultationId(data.id)
+      }
       setSubmitted(true)
     } catch (err: any) {
       console.error('Unexpected error submitting consultation:', err)
       setError(`Error: ${err.message || 'Unknown network error. Please check your connection.'}`)
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  const handleEventScheduled = async () => {
+    if (!consultationId) return
+
+    try {
+      const supabase = createClient()
+      const { error: updateError } = await supabase
+        .from('consultations')
+        .update({ status: 'scheduled' })
+        .eq('id', consultationId)
+
+      if (updateError) {
+        console.error('Error updating consultation status:', updateError)
+      } else {
+        console.log('Consultation status updated to scheduled successfully')
+      }
+    } catch (err) {
+      console.error('Unexpected error updating status:', err)
     }
   }
 
@@ -84,7 +110,10 @@ export default function Hero() {
                   <h3>Request Received!</h3>
                   <p>Thanks for your interest. To finalize your consultation, please pick a time that works for you below:</p>
                   <div className="calendly-wrapper">
-                    <CalendlyWidget prefill={{ name: formState.name, email: formState.email }} />
+                    <CalendlyWidget 
+                      prefill={{ name: formState.name, email: formState.email }} 
+                      onEventScheduled={handleEventScheduled}
+                    />
                   </div>
                   <button onClick={() => setSubmitted(false)} className="btn btn-secondary btn-sm mt-4">Send another request</button>
                 </div>

@@ -8,25 +8,40 @@ interface CalendlyWidgetProps {
     name?: string
     email?: string
   }
+  onEventScheduled?: () => void
 }
 
-export default function CalendlyWidget({ url, prefill }: CalendlyWidgetProps) {
+export default function CalendlyWidget({ url, prefill, onEventScheduled }: CalendlyWidgetProps) {
   const calendlyUrl = url || process.env.NEXT_PUBLIC_CALENDLY_URL
 
   useEffect(() => {
-    // Load Calendly widget script
+    // 1. Load Calendly widget script
     const script = document.createElement('script')
     script.src = 'https://assets.calendly.com/assets/external/widget.js'
     script.async = true
     document.body.appendChild(script)
 
+    // 2. Listen for Calendly messages
+    const handleCalendlyMessage = (e: MessageEvent) => {
+      // Check if it's a Calendly event
+      if (e.data.event && e.data.event === 'calendly.event_scheduled') {
+        console.log('Calendly event scheduled detected')
+        if (onEventScheduled) {
+          onEventScheduled()
+        }
+      }
+    }
+
+    window.addEventListener('message', handleCalendlyMessage)
+
     return () => {
-      // Cleanup script on unmount
+      // Cleanup
       if (document.body.contains(script)) {
         document.body.removeChild(script)
       }
+      window.removeEventListener('message', handleCalendlyMessage)
     }
-  }, [])
+  }, [onEventScheduled])
 
   if (!calendlyUrl) {
     return (
