@@ -51,9 +51,10 @@ export default function Hero() {
         setConsultationId(data.id)
       }
       setSubmitted(true)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Unexpected error submitting consultation:', err)
-      setError(`Error: ${err.message || 'Unknown network error. Please check your connection.'}`)
+      const message = err instanceof Error ? err.message : 'Unknown network error. Please check your connection.'
+      setError(`Error: ${message}`)
     } finally {
       setIsSubmitting(false)
     }
@@ -74,7 +75,7 @@ export default function Hero() {
       } else {
         console.log('Consultation status updated to scheduled successfully')
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Unexpected error updating status:', err)
     }
   }

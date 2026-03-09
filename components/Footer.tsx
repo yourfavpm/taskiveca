@@ -12,19 +12,28 @@ export default function Footer() {
 
   const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null)
 
-  const fetchSettings = async () => {
-    const supabase = createClient()
-    const { data, error } = await supabase.from('company_settings').select('*').single()
-    if (error) {
-      // Silently ignore — table may not exist or have no rows yet
-      return
-    }
-    if (data) setCompanySettings(data)
-  }
-
   useEffect(() => {
+    let mounted = true
+
+    const fetchSettings = async () => {
+      const supabase = createClient()
+      const { data, error } = await supabase.from('company_settings').select('*').single()
+      
+      if (!mounted) return
+      
+      if (error) {
+        // Silently ignore — table may not exist or have no rows yet
+        return
+      }
+      if (data) setCompanySettings(data)
+    }
+
     if (!pathname?.startsWith('/admin')) {
       fetchSettings()
+    }
+
+    return () => {
+      mounted = false
     }
   }, [pathname])
 
