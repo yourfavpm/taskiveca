@@ -1,12 +1,10 @@
-'use client'
-
 import { useState } from 'react'
-import { Consultation } from '@/lib/types'
+import { Consultation, AdminNote } from '@/lib/types'
 
 interface ConsultationManagerProps {
     consultations: Consultation[]
     onUpdateStatus: (id: string, status: string) => Promise<void>
-    notes: any[]
+    notes: AdminNote[]
     onFetchNotes: (id: string) => void
     onAddNote: (id: string, note: string) => Promise<void>
 }
@@ -107,6 +105,20 @@ export default function ConsultationManager({
                             <div className="info-card">
                                 <label>Project Type</label>
                                 <p>{selectedConsultation.project_type}</p>
+                            </div>
+                            <div className="info-card">
+                                <label>Phone</label>
+                                <p>{selectedConsultation.phone || 'N/A'}</p>
+                            </div>
+                            <div className="info-card">
+                                <label>Website</label>
+                                <p>
+                                    {selectedConsultation.website ? (
+                                        <a href={selectedConsultation.website} target="_blank" rel="noopener noreferrer" className="link">
+                                            Visit Site
+                                        </a>
+                                    ) : 'N/A'}
+                                </p>
                             </div>
                             <div className="info-card">
                                 <label>Country</label>
@@ -247,8 +259,8 @@ export default function ConsultationManager({
         }
 
         .detail-header h2 { font-size: 28px; font-weight: 700; margin-bottom: 8px; color: #111; }
-        .email-link { color: #2563EB; text-decoration: none; font-weight: 500; }
-        .email-link:hover { text-decoration: underline; }
+        .email-link, .link { color: #2563EB; text-decoration: none; font-weight: 500; }
+        .email-link:hover, .link:hover { text-decoration: underline; }
         .company { color: #666; }
 
         .status-select {

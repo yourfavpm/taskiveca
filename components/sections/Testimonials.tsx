@@ -1,6 +1,18 @@
 'use client'
 
-const testimonials = [
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+
+interface TestimonialData {
+    name: string
+    role: string
+    company: string
+    quote: string
+    avatar: string
+    location?: string
+}
+
+const fallbackTestimonials = [
     {
         name: "Sarah Chen",
         role: "Founder & CEO",
@@ -24,34 +36,40 @@ const testimonials = [
         location: "Montreal, QC",
         quote: "Our new e-commerce ecosystem is a masterpiece. We saw a 40% increase in conversion within the first month of going live with Taskive.",
         avatar: "ER"
-    },
-    {
-        name: "David Park",
-        role: "CTO",
-        company: "EduSphere",
-        location: "Calgary, AB",
-        quote: "The speed and quality Taskive delivers for MVPs is phenomenal. They under-promise and over-deliver every single time.",
-        avatar: "DP"
-    },
-    {
-        name: "Amina Okafor",
-        role: "Operations Lead",
-        company: "Global Impact Org",
-        location: "Ottawa, ON",
-        quote: "Finding a partner that understands impact as much as they understand code is rare. Taskive Tech is exactly that partner.",
-        avatar: "AO"
-    },
-    {
-        name: "Julian Schmidt",
-        role: "Lead Engineer",
-        company: "MediaCore",
-        location: "Halifax, NS",
-        quote: "Highly scalable, clean code, and a pleasure to collaborate with. Their team feels like an extension of our own in-house engineering squad.",
-        avatar: "JS"
     }
 ]
 
 export default function Testimonials() {
+    const [testimonials, setTestimonials] = useState<TestimonialData[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        async function fetchTestimonials() {
+            try {
+                const supabase = createClient()
+                const { data, error } = await supabase
+                    .from('testimonials')
+                    .select('name, role, company, quote, avatar')
+                    .eq('active', true)
+                    .order('created_at', { ascending: false })
+
+                if (error) throw error
+                if (data && data.length > 0) {
+                    setTestimonials(data)
+                } else {
+                    setTestimonials(fallbackTestimonials)
+                }
+            } catch (err) {
+                console.error('Error fetching testimonials:', err)
+                setTestimonials(fallbackTestimonials)
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchTestimonials()
+    }, [])
+
     return (
         <section id="testimonials" className="testimonials section">
             <div className="container">
@@ -64,20 +82,24 @@ export default function Testimonials() {
                 </div>
 
                 <div className="testimonials-grid">
-                    {testimonials.map((testimonial, index) => (
-                        <div key={index} className="testimonial-card">
-                            <div className="quote-icon">&ldquo;</div>
-                            <p className="testimonial-quote">{testimonial.quote}</p>
-                            <div className="testimonial-footer">
-                                <div className="testimonial-avatar">{testimonial.avatar}</div>
-                                <div className="testimonial-info">
-                                    <h4 className="testimonial-name">{testimonial.name}</h4>
-                                    <p className="testimonial-role">{testimonial.role} at {testimonial.company}</p>
-                                    <p className="testimonial-location">{testimonial.location}</p>
+                    {loading ? (
+                        <div className="loading-state">Loading testimonials...</div>
+                    ) : (
+                        testimonials.map((testimonial, index) => (
+                            <div key={index} className="testimonial-card">
+                                <div className="quote-icon">&ldquo;</div>
+                                <p className="testimonial-quote">{testimonial.quote}</p>
+                                <div className="testimonial-footer">
+                                    <div className="testimonial-avatar">{testimonial.avatar}</div>
+                                    <div className="testimonial-info">
+                                        <h4 className="testimonial-name">{testimonial.name}</h4>
+                                        <p className="testimonial-role">{testimonial.role} at {testimonial.company}</p>
+                                        {testimonial.location && <p className="testimonial-location">{testimonial.location}</p>}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
+                        ))
+                    )}
                 </div>
             </div>
 
@@ -202,6 +224,14 @@ export default function Testimonials() {
           color: var(--color-accent);
           font-weight: 500;
           margin-top: 2px;
+        }
+
+        .loading-state {
+          grid-column: 1 / -1;
+          text-align: center;
+          padding: 40px;
+          color: var(--color-text-secondary);
+          font-size: 15px;
         }
 
         @media (max-width: 1024px) {

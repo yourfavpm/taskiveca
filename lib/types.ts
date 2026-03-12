@@ -4,7 +4,9 @@ export interface Consultation {
     id: string
     name: string
     email: string
+    phone?: string
     company?: string
+    website?: string
     country?: string
     project_type: string
     estimated_start_time?: string
