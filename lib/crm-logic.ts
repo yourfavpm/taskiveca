@@ -1,154 +1,187 @@
 import type { CRMLead, CRMFinancials, CRMStatusHistory, AnalyticsMetrics, LeadLifecycleStatus } from './types'
+import { LEAD_STATUSES, ACTIVE_STATUSES } from './types'
 
 export function calculateAnalytics(
     leads: CRMLead[],
     financials: CRMFinancials[],
     history: CRMStatusHistory[]
 ): AnalyticsMetrics {
-    const totalConsultations = leads.length
+    const totalLeads = leads.length
+    const activeLeads = leads.filter(l => ACTIVE_STATUSES.includes(l.status)).length
 
-    // Status counts for funnel
-    const statusCounts = leads.reduce((acc, lead) => {
-        acc[lead.status] = (acc[lead.status] || 0) + 1
-        return acc
-    }, {} as Record<LeadLifecycleStatus, number>)
-
-    const lifecycleStages: LeadLifecycleStatus[] = [
+    // Conversion funnel using new statuses
+    const funnelStatuses: LeadLifecycleStatus[] = [
         'Consultation Booked',
-        'Discovery Completed',
-        'Qualified Lead',
+        'Consultation Completed',
+        'Qualification Review',
         'Proposal Sent',
-        'Negotiation / Review',
-        'Contract Signed'
+        'Follow-Up / Discussion',
+        'Approved — Awaiting Payment',
+        'Deposit Paid',
+        'Onboarding Started',
+        'Project In Development',
     ]
 
-    const conversionFunnel = lifecycleStages.map(status => {
-        const count = leads.filter(l => {
-            // Logic: if a lead is further in the funnel, they count for previous steps
-            // For simplicity here, we'll just count current status or look at history if available
-            // But better: count all leads that have EVER been in this status or beyond
-            return true // Placeholder condition
-        }).length
-
-        // Improved logic: find leads that reached this stage or beyond
-        const reachedStage = leads.filter(lead => {
-            const stageIndex = lifecycleStages.indexOf(status);
-            const currentStageIndex = lifecycleStages.indexOf(lead.status as LeadLifecycleStatus);
-            return currentStageIndex >= stageIndex || currentStageIndex === -1; // -1 means it's beyond Contract Signed
+    const conversionFunnel = funnelStatuses.map(status => {
+        const statusInfo = LEAD_STATUSES.find(s => s.value === status)
+        const stageIndex = funnelStatuses.indexOf(status)
+        // Count leads at this stage or beyond
+        const count = leads.filter(lead => {
+            const leadIndex = funnelStatuses.indexOf(lead.status)
+            return leadIndex >= stageIndex
         }).length
 
         return {
             status,
-            count: reachedStage,
-            percentage: totalConsultations > 0 ? Math.round((reachedStage / totalConsultations) * 100) : 0
+            count,
+            percentage: totalLeads > 0 ? Math.round((count / totalLeads) * 100) : 0,
+            color: statusInfo?.color || '#94a3b8',
         }
     })
 
-    // Revenue Metrics
-    const totalSigned = financials.reduce((sum, f) => sum + Number(f.agreed_value), 0)
-
-    // Group by industry
-    const byIndustryMap = leads.reduce((acc, lead) => {
-        const leadFin = financials.find(f => f.lead_id === lead.id)
-        if (leadFin && lead.industry) {
-            acc[lead.industry] = (acc[lead.industry] || 0) + Number(leadFin.agreed_value)
+    // Revenue metrics
+    const totalRevenue = financials.reduce((sum, f) => {
+        const lead = leads.find(l => l.id === f.lead_id)
+        if (!lead || !ACTIVE_STATUSES.includes(lead.status) && !['Project In Development', 'Closed Lost', 'No Show', 'Budget Mismatch', 'Not Interested'].includes(lead.status)) return sum
+        // Only count as true revenue if approved or beyond
+        const idx = funnelStatuses.indexOf(lead.status)
+        if (idx >= funnelStatuses.indexOf('Approved — Awaiting Payment')) {
+            return sum + Number(f.agreed_value || 0)
         }
-        return acc
-    }, {} as Record<string, number>)
+        return sum
+    }, 0)
 
-    const byIndustry = Object.entries(byIndustryMap).map(([industry, value]) => ({ industry, value }))
-
-    // Group by country
-    const byCountryMap = leads.reduce((acc, lead) => {
-        const leadFin = financials.find(f => f.lead_id === lead.id)
-        const country = lead.country || 'Unknown'
-        if (!acc[country]) {
-            acc[country] = { value: 0, count: 0 }
-        }
-        acc[country].count += 1
-        if (leadFin) {
-            acc[country].value += Number(leadFin.agreed_value)
-        }
-        return acc
-    }, {} as Record<string, { value: number, count: number }>)
-
-    const byCountry = Object.entries(byCountryMap).map(([country, data]) => ({
-        country,
-        value: data.value,
-        count: data.count
-    }))
-
-    // Win rate: Signed vs Proposals Sent
-    const proposalsSent = leads.filter(l =>
-        ['Proposal Sent', 'Negotiation / Review', 'Contract Signed', 'Project In Progress', 'Delivered / Handed Over', 'Retainer / Ongoing'].includes(l.status)
-    ).length
-    const contractsSigned = leads.filter(l =>
-        ['Contract Signed', 'Project In Progress', 'Delivered / Handed Over', 'Retainer / Ongoing'].includes(l.status)
-    ).length
-    const winRate = proposalsSent > 0 ? Math.round((contractsSigned / proposalsSent) * 100) : 0
-
-    // Payment metrics
     const totalPaid = financials.reduce((sum, f) => sum + Number(f.amount_paid || 0), 0)
-    const totalOutstanding = totalSigned - totalPaid
+    const totalOutstanding = Math.max(0, totalRevenue - totalPaid)
 
-    // Revenue by month (based on contract_signed_date if available, else lead created_at)
+    // Projected Revenue
+    const projectedRevenue = leads.reduce((sum, lead) => {
+        const fin = financials.find(f => f.lead_id === lead.id)
+        if (!fin || !fin.agreed_value) return sum
+
+        const value = Number(fin.agreed_value)
+        if (lead.status === 'Proposal Sent') return sum + (value * 0.5)
+        if (lead.status === 'Follow-Up / Discussion') return sum + (value * 0.75)
+        if (lead.status === 'Qualification Review') return sum + (value * 0.25)
+        return sum
+    }, 0)
+
+    const pipelineValue = totalOutstanding + projectedRevenue
+
+    // Win rate: approved/paid/project vs proposals sent
+    const proposalSentAndBeyond = leads.filter(l => {
+        const idx = funnelStatuses.indexOf(l.status)
+        return idx >= funnelStatuses.indexOf('Proposal Sent')
+    }).length
+    const approvedAndBeyond = leads.filter(l => {
+        const idx = funnelStatuses.indexOf(l.status)
+        return idx >= funnelStatuses.indexOf('Approved — Awaiting Payment')
+    }).length
+    const winRate = proposalSentAndBeyond > 0 ? Math.round((approvedAndBeyond / proposalSentAndBeyond) * 100) : 0
+
+    // Average deal size
+    const dealsWithValue = financials.filter(f => Number(f.agreed_value) > 0)
+    const averageDealSize = dealsWithValue.length > 0
+        ? Math.round(dealsWithValue.reduce((sum, f) => sum + Number(f.agreed_value), 0) / dealsWithValue.length)
+        : 0
+
+    // Conversion rate: leads that reached approval or beyond / total
+    const conversionRate = totalLeads > 0 ? Math.round((approvedAndBeyond / totalLeads) * 100) : 0
+
+    // Revenue by industry
+    const byIndustryMap: Record<string, number> = {}
+    leads.forEach(lead => {
+        const fin = financials.find(f => f.lead_id === lead.id)
+        if (fin && Number(fin.agreed_value) > 0 && lead.industry) {
+            byIndustryMap[lead.industry] = (byIndustryMap[lead.industry] || 0) + Number(fin.agreed_value)
+        }
+    })
+    const byIndustry = Object.entries(byIndustryMap)
+        .map(([industry, value]) => ({ industry, value }))
+        .sort((a, b) => b.value - a.value)
+
+    // Revenue by country
+    const byCountryMap: Record<string, { value: number; count: number }> = {}
+    leads.forEach(lead => {
+        const country = lead.country || 'Unknown'
+        if (!byCountryMap[country]) byCountryMap[country] = { value: 0, count: 0 }
+        byCountryMap[country].count += 1
+        const fin = financials.find(f => f.lead_id === lead.id)
+        if (fin) byCountryMap[country].value += Number(fin.agreed_value || 0)
+    })
+    const byCountry = Object.entries(byCountryMap)
+        .map(([country, data]) => ({ country, ...data }))
+        .sort((a, b) => b.value - a.value)
+
+    // Revenue by month
     const revenueByMonthMap: Record<string, { signed: number; paid: number }> = {}
     leads.forEach(lead => {
-        const leadFin = financials.find(f => f.lead_id === lead.id)
-        if (leadFin && Number(leadFin.agreed_value) > 0) {
+        const fin = financials.find(f => f.lead_id === lead.id)
+        if (fin && Number(fin.agreed_value) > 0) {
             const dateStr = lead.contract_signed_date || lead.created_at
-            if (dateStr) {
+            if (!dateStr) return
+            try {
                 const date = new Date(dateStr)
-                const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-                if (!revenueByMonthMap[monthKey]) {
-                    revenueByMonthMap[monthKey] = { signed: 0, paid: 0 }
-                }
-                revenueByMonthMap[monthKey].signed += Number(leadFin.agreed_value)
-                revenueByMonthMap[monthKey].paid += Number(leadFin.amount_paid || 0)
-            }
+                if (isNaN(date.getTime())) return
+                const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+                if (!revenueByMonthMap[key]) revenueByMonthMap[key] = { signed: 0, paid: 0 }
+                revenueByMonthMap[key].signed += Number(fin.agreed_value)
+                revenueByMonthMap[key].paid += Number(fin.amount_paid || 0)
+            } catch { /* skip */ }
         }
     })
-
     const byMonth = Object.entries(revenueByMonthMap)
         .sort(([a], [b]) => a.localeCompare(b))
-        .slice(-6) // Last 6 months
-        .map(([month, data]) => ({ month, signed: data.signed, paid: data.paid }))
+        .slice(-6)
+        .map(([month, data]) => ({ month, ...data }))
 
-    // Leads trend by month
-    const leadsTrendMap: Record<string, { newLeads: number; converted: number }> = {}
+    // Leads trend
+    const trendMap: Record<string, { newLeads: number; converted: number }> = {}
     leads.forEach(lead => {
-        const createdDate = new Date(lead.created_at)
-        const monthKey = `${createdDate.getFullYear()}-${String(createdDate.getMonth() + 1).padStart(2, '0')}`
-        if (!leadsTrendMap[monthKey]) {
-            leadsTrendMap[monthKey] = { newLeads: 0, converted: 0 }
-        }
-        leadsTrendMap[monthKey].newLeads += 1
-
-        // Count as converted if reached Contract Signed or beyond
-        const convertedStatuses = ['Contract Signed', 'Project In Progress', 'Delivered / Handed Over', 'Retainer / Ongoing']
-        if (convertedStatuses.includes(lead.status)) {
-            leadsTrendMap[monthKey].converted += 1
-        }
+        if (!lead.created_at) return
+        try {
+            const d = new Date(lead.created_at)
+            if (isNaN(d.getTime())) return
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+            if (!trendMap[key]) trendMap[key] = { newLeads: 0, converted: 0 }
+            trendMap[key].newLeads += 1
+            const idx = funnelStatuses.indexOf(lead.status)
+            if (idx >= funnelStatuses.indexOf('Approved — Awaiting Payment')) {
+                trendMap[key].converted += 1
+            }
+        } catch { /* skip */ }
     })
-
-    const leadsTrend = Object.entries(leadsTrendMap)
+    const leadsTrend = Object.entries(trendMap)
         .sort(([a], [b]) => a.localeCompare(b))
-        .slice(-6) // Last 6 months
-        .map(([month, data]) => ({ month, newLeads: data.newLeads, converted: data.converted }))
+        .slice(-6)
+        .map(([month, data]) => ({ month, ...data }))
+
+    // Recent activity from history
+    const recentActivity = history
+        .slice(0, 10)
+        .map(h => {
+            const lead = leads.find(l => l.id === h.lead_id)
+            return {
+                date: h.changed_at,
+                action: h.notes || `Status changed to ${h.new_status}`,
+                lead: lead?.company_name || 'Unknown',
+            }
+        })
 
     return {
-        totalConsultations,
+        totalLeads,
+        activeLeads,
+        conversionRate,
+        totalRevenue,
+        totalPaid,
+        totalOutstanding,
+        projectedRevenue,
+        pipelineValue,
+        averageDealSize,
+        winRate,
         conversionFunnel,
-        revenueData: {
-            totalSigned,
-            totalPaid,
-            totalOutstanding,
-            byMonth,
-            byIndustry,
-            byCountry,
-            averageDealSize: contractsSigned > 0 ? Math.round(totalSigned / contractsSigned) : 0,
-            winRate
-        },
-        leadsTrend
+        revenueData: { byMonth, byIndustry, byCountry },
+        leadsTrend,
+        recentActivity,
     }
 }

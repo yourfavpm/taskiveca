@@ -1,15 +1,15 @@
-'use client'
-
 import { useState, useEffect } from 'react'
 import { CaseStudy } from '@/lib/types'
+import { createClient } from '@/lib/supabase/client'
 
 interface CaseStudyEditorProps {
     initialData?: CaseStudy | null
+    existingSlugs?: string[]
     onSave: (data: Partial<CaseStudy>) => Promise<void>
     onCancel: () => void
 }
 
-export default function CaseStudyEditor({ initialData, onSave, onCancel }: CaseStudyEditorProps) {
+export default function CaseStudyEditor({ initialData, existingSlugs = [], onSave, onCancel }: CaseStudyEditorProps) {
     const [formData, setFormData] = useState<Partial<CaseStudy>>({
         title: '',
         slug: '',
@@ -18,34 +18,116 @@ export default function CaseStudyEditor({ initialData, onSave, onCancel }: CaseS
         challenge: '',
         solution: '',
         outcome: '',
-        process: '',
+        process: [],
         featured: false,
         published: false,
         images: []
     })
 
-    // To support multiple images input simply as comma-separated string for now
-    const [imagesString, setImagesString] = useState('')
+    const [isUploading, setIsUploading] = useState(false)
+    const supabase = createClient()
+
+    const [isAutoSlug, setIsAutoSlug] = useState(!initialData?.slug)
 
     useEffect(() => {
         if (initialData) {
-            setFormData(initialData)
-            setImagesString(initialData.images?.join(', ') || '')
+            setFormData({
+                ...initialData,
+                process: Array.isArray(initialData.process) ? initialData.process : [],
+                images: Array.isArray(initialData.images) ? initialData.images : []
+            })
+            setIsAutoSlug(false)
         }
     }, [initialData])
 
-    const handleChange = (field: keyof CaseStudy, value: any) => {
-        setFormData(prev => ({ ...prev, [field]: value }))
+    const slugify = (text: string) => {
+        return text
+            .toString()
+            .toLowerCase()
+            .trim()
+            .replace(/\s+/g, '-')     // Replace spaces with -
+            .replace(/[^\w-]+/g, '')   // Remove all non-word chars
+            .replace(/--+/g, '-')      // Replace multiple - with single -
+            .replace(/^-+/, '')        // Trim - from start of text
+            .replace(/-+$/, '')        // Trim - from end of text
+    }
+
+    const handleChange = (field: keyof CaseStudy, value: string | string[] | boolean) => {
+        setFormData(prev => {
+            const newData = { ...prev, [field]: value }
+            
+            // Auto-slugify if title changed and auto-slug is enabled
+            if (field === 'title' && isAutoSlug && typeof value === 'string') {
+                newData.slug = slugify(value)
+            }
+            
+            return newData
+        })
+    }
+
+    const handleSlugChange = (value: string) => {
+        setIsAutoSlug(false)
+        handleChange('slug', value)
+    }
+
+    const handleProcessChange = (index: number, value: string) => {
+        const newProcess = [...(formData.process || [])]
+        newProcess[index] = value
+        handleChange('process', newProcess)
+    }
+
+    const addProcessStep = () => {
+        handleChange('process', [...(formData.process || []), ''])
+    }
+
+    const removeProcessStep = (index: number) => {
+        const newProcess = (formData.process || []).filter((_, i) => i !== index)
+        handleChange('process', newProcess)
+    }
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files
+        if (!files || files.length === 0) return
+
+        setIsUploading(true)
+        try {
+            const newImages = [...(formData.images || [])]
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i]
+                const fileExt = file.name.split('.').pop()
+                const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`
+                const filePath = `case-studies/${fileName}`
+
+                const { error: uploadError } = await supabase.storage
+                    .from('case-studies')
+                    .upload(filePath, file)
+
+                if (uploadError) throw uploadError
+
+                const { data: { publicUrl } } = supabase.storage
+                    .from('case-studies')
+                    .getPublicUrl(filePath)
+
+                newImages.push(publicUrl)
+            }
+
+            handleChange('images', newImages)
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            alert('Error uploading image: ' + message)
+        } finally {
+            setIsUploading(false)
+        }
+    }
+
+    const removeImage = (url: string) => {
+        handleChange('images', (formData.images || []).filter(img => img !== url))
     }
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault()
-
-        // Process images
-        const processedImages = imagesString.split(',').map(s => s.trim()).filter(Boolean)
-        const finalData = { ...formData, images: processedImages }
-
-        await onSave(finalData)
+        await onSave(formData)
     }
 
     return (
@@ -70,7 +152,8 @@ export default function CaseStudyEditor({ initialData, onSave, onCancel }: CaseS
                             <label>Slug (URL)</label>
                             <input
                                 value={formData.slug || ''}
-                                onChange={e => handleChange('slug', e.target.value)}
+                                onChange={e => handleSlugChange(e.target.value)}
+                                placeholder="project-name-slug"
                                 required
                             />
                         </div>
@@ -79,6 +162,7 @@ export default function CaseStudyEditor({ initialData, onSave, onCancel }: CaseS
                             <input
                                 value={formData.industry || ''}
                                 onChange={e => handleChange('industry', e.target.value)}
+                                placeholder="e.g. Fintech"
                             />
                         </div>
                     </div>
@@ -89,6 +173,7 @@ export default function CaseStudyEditor({ initialData, onSave, onCancel }: CaseS
                             value={formData.summary || ''}
                             onChange={e => handleChange('summary', e.target.value)}
                             rows={2}
+                            placeholder="Brief catchy summary for the homepage card"
                         />
                     </div>
 
@@ -97,7 +182,8 @@ export default function CaseStudyEditor({ initialData, onSave, onCancel }: CaseS
                         <textarea
                             value={formData.challenge || ''}
                             onChange={e => handleChange('challenge', e.target.value)}
-                            rows={4}
+                            rows={3}
+                            placeholder="What problem were we trying to solve?"
                         />
                     </div>
 
@@ -106,18 +192,27 @@ export default function CaseStudyEditor({ initialData, onSave, onCancel }: CaseS
                         <textarea
                             value={formData.solution || ''}
                             onChange={e => handleChange('solution', e.target.value)}
-                            rows={4}
+                            rows={3}
+                            placeholder="How did we solve it?"
                         />
                     </div>
 
                     <div className="form-group full">
                         <label>Process (Steps)</label>
-                        <textarea
-                            value={formData.process || ''}
-                            onChange={e => handleChange('process', e.target.value)}
-                            rows={3}
-                            placeholder="Step 1... Step 2..."
-                        />
+                        <div className="steps-list">
+                            {(formData.process || []).map((step, index) => (
+                                <div key={index} className="step-item">
+                                    <span className="step-num">{index + 1}</span>
+                                    <input
+                                        value={step}
+                                        onChange={e => handleProcessChange(index, e.target.value)}
+                                        placeholder="e.g. User Research or Technical Strategy"
+                                    />
+                                    <button type="button" onClick={() => removeProcessStep(index)} className="remove-step">×</button>
+                                </div>
+                            ))}
+                            <button type="button" onClick={addProcessStep} className="add-step-btn">+ Add Step</button>
+                        </div>
                     </div>
 
                     <div className="form-group full">
@@ -130,12 +225,22 @@ export default function CaseStudyEditor({ initialData, onSave, onCancel }: CaseS
                     </div>
 
                     <div className="form-group full">
-                        <label>Showcase Images (Comma separated URLs)</label>
-                        <input
-                            value={imagesString}
-                            onChange={e => setImagesString(e.target.value)}
-                            placeholder="https://..., https://..."
-                        />
+                        <label>Showcase Images</label>
+                        <div className="image-uploader">
+                            <div className="image-grid">
+                                {(formData.images || []).map((url, idx) => (
+                                    <div key={idx} className="image-preview">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={url} alt={`Project ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        <button type="button" onClick={() => removeImage(url)} className="delete-img">×</button>
+                                    </div>
+                                ))}
+                                <label className="upload-box">
+                                    {isUploading ? '...' : '+'}
+                                    <input type="file" multiple accept="image/*" onChange={handleFileUpload} disabled={isUploading} hidden />
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="toggle-row">
@@ -159,7 +264,7 @@ export default function CaseStudyEditor({ initialData, onSave, onCancel }: CaseS
 
                     <div className="editor-actions">
                         <button type="button" onClick={onCancel} className="cancel-btn">Cancel</button>
-                        <button type="submit" className="save-btn">Save Project</button>
+                        <button type="submit" className="save-btn" disabled={isUploading}>Save Project</button>
                     </div>
                 </form>
             </div>
@@ -175,7 +280,7 @@ export default function CaseStudyEditor({ initialData, onSave, onCancel }: CaseS
 
         .editor-modal {
           background: #fff;
-          width: 90%; max-width: 800px;
+          width: 95%; max-width: 900px;
           height: 90vh;
           border-radius: 12px;
           display: flex; flex-direction: column;
@@ -183,42 +288,62 @@ export default function CaseStudyEditor({ initialData, onSave, onCancel }: CaseS
         }
 
         .editor-header {
-          padding: 24px;
+          padding: 20px 24px;
           border-bottom: 1px solid #eee;
           display: flex; justify-content: space-between; align-items: center;
         }
-        .editor-header h2 { font-size: 20px; font-weight: 700; margin: 0; }
+        .editor-header h2 { font-size: 18px; font-weight: 700; margin: 0; }
         .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #666; }
 
-        .editor-form { padding: 32px; overflow-y: auto; flex: 1; }
+        .editor-form { padding: 24px; overflow-y: auto; flex: 1; }
         
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-        .form-group { margin-bottom: 20px; }
+        .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+        .form-group { margin-bottom: 16px; }
         .form-group.full { width: 100%; }
         
         .form-group label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 8px; }
         .form-group input, .form-group textarea {
-          width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px;
-          font-size: 15px;
+          width: 100%; padding: 10px; border: 1px solid #eee; border-radius: 8px;
+          font-size: 14px; background: #fafafa;
         }
-        .form-group input:focus, .form-group textarea:focus { border-color: #2563EB; outline: none; }
+        .form-group input:focus, .form-group textarea:focus { border-color: #000; outline: none; background: #fff; }
 
-        .toggle-row { display: flex; gap: 24px; margin: 24px 0; padding: 20px; background: #f9f9f9; border-radius: 8px; }
-        .toggle { display: flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer; }
+        .steps-list { display: flex; flex-direction: column; gap: 8px; }
+        .step-item { display: flex; align-items: center; gap: 10px; }
+        .step-num { 
+          width: 24px; height: 24px; background: #eee; border-radius: 50%; 
+          display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700;
+        }
+        .remove-step { background: none; border: none; font-size: 18px; color: #ff4d4f; cursor: pointer; }
+        .add-step-btn { 
+          align-self: flex-start; padding: 6px 12px; background: #f0f0f0; border: none; 
+          border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 4px;
+        }
+
+        .image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; }
+        .image-preview { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; border: 1px solid #eee; }
+        .image-preview img { width: 100%; height: 100%; object-fit: cover; }
+        .delete-img { 
+          position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.5); color: #fff; 
+          border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px;
+        }
+        .upload-box { 
+          aspect-ratio: 1; border: 2px dashed #eee; border-radius: 8px; 
+          display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 24px; color: #ccc;
+        }
+        .upload-box:hover { border-color: #ddd; color: #999; }
+
+        .toggle-row { display: flex; gap: 24px; margin: 20px 0; padding: 16px; background: #f9f9f9; border-radius: 8px; }
+        .toggle { display: flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer; font-size: 13px; }
 
         .editor-actions {
-          padding-top: 24px; border-top: 1px solid #eee;
+          padding-top: 20px; border-top: 1px solid #eee;
           display: flex; justify-content: flex-end; gap: 12px;
         }
 
-        .cancel-btn {
-          padding: 10px 20px; background: transparent; border: 1px solid #ddd;
-          border-radius: 6px; font-weight: 600; cursor: pointer;
-        }
-        .save-btn {
-          padding: 10px 24px; background: #111; color: #fff; border: none;
-          border-radius: 6px; font-weight: 600; cursor: pointer;
-        }
+        .cancel-btn { padding: 10px 20px; background: transparent; border: 1px solid #ddd; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; }
+        .save-btn { padding: 10px 24px; background: #111; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 13px; }
+        .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
       `}</style>
         </div>
     )

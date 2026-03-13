@@ -4,19 +4,25 @@ interface SidebarProps {
   activeTab: string
   setActiveTab: (tab: string) => void
   userEmail?: string
+  adminRole?: string
   onLogout: () => void
 }
 
-export default function Sidebar({ activeTab, setActiveTab, userEmail, onLogout }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, userEmail, adminRole, onLogout }: SidebarProps) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'crm', label: 'CRM / Pipeline', icon: '🤝' },
+    { id: 'projects', label: 'Projects', icon: '📁' },
     { id: 'analytics', label: 'Analytics', icon: '📈' },
     { id: 'consultations', label: 'Consultations', icon: '💬' },
     { id: 'casestudies', label: 'Case Studies', icon: '📁' },
     { id: 'testimonials', label: 'Testimonials', icon: '⭐' },
     { id: 'settings', label: 'Settings', icon: '⚙️' },
   ]
+
+  if (adminRole === 'super_admin') {
+      menuItems.push({ id: 'team', label: 'Team', icon: '👥' })
+  }
 
   return (
     <aside className="sidebar">

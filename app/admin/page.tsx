@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 
-import type { Consultation, CaseStudy, CompanySettings } from '@/lib/types'
+import type { Consultation, CaseStudy, CompanySettings, AdminNote } from '@/lib/types'
 import Sidebar from '@/components/admin/Sidebar'
 import DashboardStats from '@/components/admin/DashboardStats'
 import ConsultationManager from '@/components/admin/ConsultationManager'
@@ -19,11 +19,17 @@ import TestimonialManager from '@/components/admin/TestimonialManager'
 // CRM & Analytics Components
 import PipelineView from '@/components/admin/CRM/PipelineView'
 import AnalyticsDashboard from '@/components/admin/Analytics/AnalyticsDashboard'
+import ProjectList from '@/components/admin/Projects/ProjectList'
+import GlobalSearch from '@/components/admin/GlobalSearch'
+import AdminManager from '@/components/admin/UserManagement/AdminManager'
+import type { AdminRole } from '@/lib/types'
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(null)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
 
   // Data States
   const [consultations, setConsultations] = useState<Consultation[]>([])
@@ -34,7 +40,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ total: 0, new: 0, completed: 0, conversionRate: 0 })
 
   // Sub-component States
-  const [notes, setNotes] = useState<{ id: string; note: string; created_at: string }[]>([])
+  const [notes, setNotes] = useState<AdminNote[]>([])
   const [editingCaseStudy, setEditingCaseStudy] = useState<CaseStudy | null>(null)
   const [isEditing, setIsEditing] = useState(false) // For toggling the modal
 
@@ -92,7 +98,7 @@ export default function AdminDashboard() {
     // Verify if the user is in the admins table (case-insensitive)
     const { data: adminEntry, error: adminError } = await supabase
       .from('admins')
-      .select('email')
+      .select('email, role')
       .ilike('email', user.email || '')
       .single()
 
@@ -107,6 +113,8 @@ export default function AdminDashboard() {
     }
 
     setUser(user)
+    setAdminRole(adminEntry.role as AdminRole)
+    
     await Promise.all([
       fetchConsultations(),
       fetchCaseStudies(),
@@ -136,6 +144,18 @@ export default function AdminDashboard() {
     await supabase.auth.signOut()
     router.push('/admin/login')
   }
+
+  // Keyboard shortcut handler for Cmd+K search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setIsSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const updateStatus = async (id: string, status: string) => {
     await supabase.from('consultations').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
@@ -191,17 +211,27 @@ export default function AdminDashboard() {
   }
 
   const saveCaseStudy = async (data: Partial<CaseStudy>) => {
-    if (data.id) {
-      // Update
-      const { error } = await supabase.from('case_studies').update(data).eq('id', data.id)
-      if (error) alert('Error updating: ' + error.message)
-    } else {
-      // Insert
-      const { error } = await supabase.from('case_studies').insert([data])
-      if (error) alert('Error creating: ' + error.message)
+    try {
+      if (data.id) {
+        // Update
+        const { error } = await supabase.from('case_studies').update(data).eq('id', data.id)
+        if (error) throw error
+      } else {
+        // Insert
+        const { error } = await supabase.from('case_studies').insert([data])
+        if (error) throw error
+      }
+      setIsEditing(false)
+      fetchCaseStudies()
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string }
+      console.error('Error saving case study:', err)
+      if (err.code === '23505') {
+        alert('Error: A case study with this slug already exists. Please use a different slug.')
+      } else {
+        alert('Error saving case study: ' + (err.message || 'Unknown error'))
+      }
     }
-    setIsEditing(false)
-    fetchCaseStudies()
   }
 
   if (loading) return <div className="loading-screen">Loading secure dashboard...</div>
@@ -212,10 +242,23 @@ export default function AdminDashboard() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         userEmail={user?.email}
+        adminRole={adminRole || undefined}
         onLogout={handleLogout}
       />
 
       <main className="main-content">
+        
+        {/* Search Button */}
+        <div className="flex justify-end mb-8">
+            <button 
+                onClick={() => setIsSearchOpen(true)}
+                className="group flex items-center gap-3 px-5 py-2.5 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:border-blue-200 hover:text-blue-500 transition-all shadow-sm hover:shadow-md active:scale-95"
+            >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <span className="text-xs font-bold uppercase tracking-widest">Search Console</span>
+                <span className="text-[10px] bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100 ml-2 font-bold text-slate-300 group-hover:text-blue-300 transition-colors">⌘K</span>
+            </button>
+        </div>
 
         {activeTab === 'dashboard' && (
           <div className="view-animate">
@@ -282,6 +325,12 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {activeTab === 'projects' && (
+          <div className="view-animate">
+            <ProjectList />
+          </div>
+        )}
+
         {activeTab === 'analytics' && (
           <div className="view-animate">
             <AnalyticsDashboard />
@@ -294,16 +343,30 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {activeTab === 'team' && adminRole === 'super_admin' && (
+          <div className="view-animate">
+            <AdminManager />
+          </div>
+        )}
+
       </main>
 
       {/* CMS Modal */}
       {isEditing && (
         <CaseStudyEditor
           initialData={editingCaseStudy}
+          existingSlugs={caseStudies.map(cs => cs.slug)}
           onSave={saveCaseStudy}
           onCancel={() => setIsEditing(false)}
         />
       )}
+
+      {/* Global Search Overly */}
+      <GlobalSearch 
+        isOpen={isSearchOpen} 
+        onClose={() => setIsSearchOpen(false)} 
+        onNavigate={setActiveTab} 
+      />
 
       <style jsx>{`
         .loading-screen { height: 100vh; display: flex; align-items: center; justify-content: center; background: #fff; color: #666; font-size: 14px; }

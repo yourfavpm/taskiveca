@@ -49,7 +49,7 @@ export default function Testimonials() {
                 const supabase = createClient()
                 const { data, error } = await supabase
                     .from('testimonials')
-                    .select('name, role, company, quote, avatar')
+                    .select('name, role, company, quote, avatar, active, created_at')
                     .eq('active', true)
                     .order('created_at', { ascending: false })
 
@@ -59,8 +59,17 @@ export default function Testimonials() {
                 } else {
                     setTestimonials(fallbackTestimonials)
                 }
-            } catch (err) {
-                console.error('Error fetching testimonials:', err)
+            } catch (err: unknown) {
+                const error = err as { name?: string; message?: string; details?: string; hint?: string; code?: string };
+                // Ignore abort errors which are common in React Strict Mode double-invocations
+                if (error.name === 'AbortError') return
+
+                console.error('Testimonials fetch error:', {
+                    message: error.message,
+                    details: error.details,
+                    hint: error.hint,
+                    code: error.code
+                })
                 setTestimonials(fallbackTestimonials)
             } finally {
                 setLoading(false)
@@ -242,10 +251,22 @@ export default function Testimonials() {
 
         @media (max-width: 768px) {
           .testimonials-grid {
-            grid-template-columns: 1fr;
+            display: flex;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            gap: 20px;
+            padding: 20px 20px 40px;
+            margin: 0 -20px;
+            scrollbar-width: none;
+          }
+
+          .testimonials-grid::-webkit-scrollbar {
+            display: none;
           }
           
           .testimonial-card {
+            min-width: 85%;
+            scroll-snap-align: center;
             padding: 32px;
           }
           

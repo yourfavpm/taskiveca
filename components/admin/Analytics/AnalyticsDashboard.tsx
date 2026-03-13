@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { AnalyticsMetrics, CRMLead, CRMFinancials, CRMStatusHistory } from '@/lib/types'
 import { calculateAnalytics } from '@/lib/crm-logic'
@@ -10,505 +10,341 @@ export default function AnalyticsDashboard() {
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchAnalytics()
-  }, [])
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     setLoading(true)
     const [leadsRes, finRes, histRes] = await Promise.all([
       supabase.from('crm_leads').select('*'),
       supabase.from('crm_financials').select('*'),
-      supabase.from('crm_status_history').select('*')
+      supabase.from('crm_status_history').select('*').order('changed_at', { ascending: false }).limit(50),
     ])
 
-    if (leadsRes.data) {
-      const calculated = calculateAnalytics(
-        leadsRes.data as CRMLead[],
-        (finRes.data || []) as CRMFinancials[],
-        (histRes.data || []) as CRMStatusHistory[]
-      )
-      setMetrics(calculated)
-    }
+    const leads = (leadsRes.data || []) as CRMLead[]
+    const financials = (finRes.data || []) as CRMFinancials[]
+    const history = (histRes.data || []) as CRMStatusHistory[]
+
+    const m = calculateAnalytics(leads, financials, history)
+    setMetrics(m)
     setLoading(false)
+  }, [supabase])
+
+  useEffect(() => { fetchAnalytics() }, [fetchAnalytics])
+
+  if (loading) return <div className="analytics-loading"><div className="spinner" />Loading analytics...</div>
+
+  if (!metrics || metrics.totalLeads === 0) {
+    return (
+      <div className="analytics-empty">
+        <div className="empty-icon">📊</div>
+        <h2>No Analytics Data Yet</h2>
+        <p>Analytics will populate automatically as you add leads and consultations to your CRM pipeline.</p>
+        <div className="empty-hint">
+          <span>💡</span>
+          <span>Book a consultation through your website or add a lead manually in the CRM tab to get started.</span>
+        </div>
+      </div>
+    )
   }
 
-  if (loading) return <div className="loading-state">Analyzing pipeline data...</div>
-  if (!metrics) return <div className="no-data">No data available for analysis.</div>
+  const m = metrics
+
+  // Find max funnel count for scaling bars
+  const maxFunnel = Math.max(...m.conversionFunnel.map(f => f.count), 1)
+  const maxRevMonth = Math.max(...m.revenueData.byMonth.map(r => Math.max(r.signed, r.paid)), 1)
+  const maxTrend = Math.max(...m.leadsTrend.map(t => Math.max(t.newLeads, t.converted)), 1)
 
   return (
     <div className="analytics-container">
-      <h1 className="page-title">Operational & Revenue Analytics</h1>
+      <div className="analytics-header">
+        <h1 className="page-title">Analytics Dashboard</h1>
+        <button className="refresh-btn" onClick={fetchAnalytics}>↻ Refresh</button>
+      </div>
 
-      <div className="top-stats">
-        <div className="stat-card">
-          <label>Total Pipeline Value</label>
-          <span className="value">USD {metrics.revenueData.totalSigned.toLocaleString()}</span>
+      {/* Summary Cards */}
+      <div className="summary-grid">
+        <div className="summary-card">
+          <div className="card-icon blue">📋</div>
+          <div className="card-info">
+            <span className="card-value">{m.totalLeads}</span>
+            <span className="card-label">Total Leads</span>
+          </div>
         </div>
-        <div className="stat-card highlight-green">
-          <label>Revenue Received</label>
-          <span className="value">USD {metrics.revenueData.totalPaid.toLocaleString()}</span>
+        <div className="summary-card">
+          <div className="card-icon green">✅</div>
+          <div className="card-info">
+            <span className="card-value">{m.activeLeads}</span>
+            <span className="card-label">Active Leads</span>
+          </div>
         </div>
-        <div className="stat-card highlight-red">
-          <label>Outstanding Balance</label>
-          <span className="value">USD {metrics.revenueData.totalOutstanding.toLocaleString()}</span>
+        <div className="summary-card">
+          <div className="card-icon purple">🎯</div>
+          <div className="card-info">
+            <span className="card-value">{m.conversionRate}%</span>
+            <span className="card-label">Conversion Rate</span>
+          </div>
         </div>
-        <div className="stat-card">
-          <label>Average Deal Size</label>
-          <span className="value">USD {metrics.revenueData.averageDealSize.toLocaleString()}</span>
+        <div className="summary-card">
+          <div className="card-icon amber">💰</div>
+          <div className="card-info">
+            <span className="card-value">${m.totalRevenue.toLocaleString()}</span>
+            <span className="card-label">Total Revenue</span>
+          </div>
         </div>
-        <div className="stat-card">
-          <label>Win Rate</label>
-          <span className="value">{metrics.revenueData.winRate}%</span>
+        <div className="summary-card">
+          <div className="card-icon emerald">💵</div>
+          <div className="card-info">
+            <span className="card-value">${m.totalPaid.toLocaleString()}</span>
+            <span className="card-label">Total Collected</span>
+          </div>
         </div>
-        <div className="stat-card">
-          <label>Lead Velocity</label>
-          <span className="value">{metrics.totalConsultations} Leads</span>
+        <div className="summary-card">
+          <div className="card-icon red">📊</div>
+          <div className="card-info">
+            <span className="card-value">${m.totalOutstanding.toLocaleString()}</span>
+            <span className="card-label">Outstanding</span>
+          </div>
+        </div>
+        <div className="summary-card">
+          <div className="card-icon indigo">📈</div>
+          <div className="card-info">
+            <span className="card-value">${m.averageDealSize.toLocaleString()}</span>
+            <span className="card-label">Avg Deal Size</span>
+          </div>
+        </div>
+        <div className="summary-card">
+          <div className="card-icon teal">🏆</div>
+          <div className="card-info">
+            <span className="card-value">{m.winRate}%</span>
+            <span className="card-label">Win Rate</span>
+          </div>
+        </div>
+        <div className="summary-card outline-amber">
+          <div className="card-icon amber">⏳</div>
+          <div className="card-info">
+            <span className="card-value">${m.projectedRevenue.toLocaleString()}</span>
+            <span className="card-label">Projected Revenue</span>
+          </div>
+        </div>
+        <div className="summary-card outline-emerald">
+          <div className="card-icon emerald">📈</div>
+          <div className="card-info">
+            <span className="card-value">${m.pipelineValue.toLocaleString()}</span>
+            <span className="card-label">Total Pipeline Value</span>
+          </div>
         </div>
       </div>
 
-      <div className="metrics-grid">
-        <section className="chart-card">
-          <h3>Lead Conversion Funnel</h3>
-          <div className="funnel-viz">
-            {metrics.conversionFunnel.map((stage, idx) => (
-              <div key={stage.status} className="funnel-stage" style={{ width: `${100 - (idx * 5)}%` }}>
-                <span className="stage-label">{stage.status}</span>
-                <span className="stage-count">{stage.count} ({stage.percentage}%)</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="chart-card">
-          <h3>Revenue by Industry</h3>
-          <div className="bar-chart">
-            {metrics.revenueData.byIndustry.map((item) => (
-              <div key={item.industry} className="bar-row">
-                <div className="bar-label">{item.industry}</div>
-                <div className="bar-container">
-                  <div
-                    className="bar-fill"
-                    style={{
-                      width: `${metrics.revenueData.totalSigned > 0 ? (item.value / metrics.revenueData.totalSigned) * 100 : 0}%`
-                    }}
-                  ></div>
+      {/* Charts Row */}
+      <div className="charts-grid">
+        {/* Conversion Funnel */}
+        <div className="chart-card wide">
+          <h3>Conversion Funnel</h3>
+          <div className="funnel-chart">
+            {m.conversionFunnel.map((f) => (
+              <div key={f.status} className="funnel-row">
+                <div className="funnel-label">{f.status}</div>
+                <div className="funnel-bar-container">
+                  <div className="funnel-bar" style={{ width: `${(f.count / maxFunnel) * 100}%`, background: f.color }} />
+                  <span className="funnel-value">{f.count} ({f.percentage}%)</span>
                 </div>
-                <div className="bar-value">USD {item.value.toLocaleString()}</div>
               </div>
             ))}
-            {metrics.revenueData.byIndustry.length === 0 && <p className="no-data-msg">No industry data yet.</p>}
           </div>
-        </section>
+        </div>
 
-        <section className="chart-card">
-          <h3>Clients by Country</h3>
-          <div className="bar-chart">
-            {metrics.revenueData.byCountry?.map((item) => (
-              <div key={item.country} className="bar-row">
-                <div className="bar-label">{item.country}</div>
-                <div className="bar-container">
-                  <div
-                    className="bar-fill"
-                    style={{
-                      width: `${metrics.revenueData.totalSigned > 0 ? (item.value / metrics.revenueData.totalSigned) * 100 : 0}%`
-                    }}
-                  ></div>
+        {/* Revenue by Month */}
+        {m.revenueData.byMonth.length > 0 && (
+          <div className="chart-card">
+            <h3>Revenue by Month</h3>
+            <div className="bar-chart">
+              {m.revenueData.byMonth.map(r => (
+                <div key={r.month} className="bar-group">
+                  <div className="bars">
+                    <div className="bar signed" style={{ height: `${(r.signed / maxRevMonth) * 120}px` }} title={`Signed: $${r.signed.toLocaleString()}`} />
+                    <div className="bar paid" style={{ height: `${(r.paid / maxRevMonth) * 120}px` }} title={`Paid: $${r.paid.toLocaleString()}`} />
+                  </div>
+                  <span className="bar-label">{r.month}</span>
                 </div>
-                <div className="bar-value">USD {item.value.toLocaleString()}</div>
-              </div>
-            ))}
-            {(!metrics.revenueData.byCountry || metrics.revenueData.byCountry.length === 0) && <p className="no-data-msg">No country data yet.</p>}
+              ))}
+            </div>
+            <div className="chart-legend">
+              <span className="legend-item"><span className="dot signed" />Signed</span>
+              <span className="legend-item"><span className="dot paid" />Paid</span>
+            </div>
           </div>
-        </section>
+        )}
+
+        {/* Leads Trend */}
+        {m.leadsTrend.length > 0 && (
+          <div className="chart-card">
+            <h3>Leads Trend</h3>
+            <div className="bar-chart">
+              {m.leadsTrend.map(t => (
+                <div key={t.month} className="bar-group">
+                  <div className="bars">
+                    <div className="bar new-leads" style={{ height: `${(t.newLeads / maxTrend) * 120}px` }} title={`New: ${t.newLeads}`} />
+                    <div className="bar converted-leads" style={{ height: `${(t.converted / maxTrend) * 120}px` }} title={`Converted: ${t.converted}`} />
+                  </div>
+                  <span className="bar-label">{t.month}</span>
+                </div>
+              ))}
+            </div>
+            <div className="chart-legend">
+              <span className="legend-item"><span className="dot new-leads" />New</span>
+              <span className="legend-item"><span className="dot converted-leads" />Converted</span>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Trend Charts Section */}
-      <div className="trends-section">
-        <section className="chart-card wide-chart">
-          <h3>Revenue Trend (Monthly)</h3>
-          <div className="trend-chart">
-            {metrics.revenueData.byMonth.length > 0 ? (
-              <div className="bar-chart-horizontal">
-                {metrics.revenueData.byMonth.map(item => {
-                  const maxValue = Math.max(...metrics.revenueData.byMonth.map(m => m.signed))
-                  return (
-                    <div key={item.month} className="trend-row">
-                      <div className="trend-label">{item.month}</div>
-                      <div className="trend-bars">
-                        <div className="stacked-bar">
-                          <div
-                            className="bar-signed"
-                            style={{ width: `${maxValue > 0 ? (item.signed / maxValue) * 100 : 0}%` }}
-                            title={`Signed: $${item.signed.toLocaleString()}`}
-                          ></div>
-                          <div
-                            className="bar-paid"
-                            style={{ width: `${maxValue > 0 ? (item.paid / maxValue) * 100 : 0}%` }}
-                            title={`Paid: $${item.paid.toLocaleString()}`}
-                          ></div>
-                        </div>
-                      </div>
-                      <div className="trend-values">
-                        <span className="signed-value">${item.signed.toLocaleString()}</span>
-                        <span className="paid-value">${item.paid.toLocaleString()}</span>
-                      </div>
+      {/* Bottom Row */}
+      <div className="bottom-grid">
+        {/* Revenue by Industry */}
+        {m.revenueData.byIndustry.length > 0 && (
+          <div className="chart-card">
+            <h3>Revenue by Industry</h3>
+            <div className="list-chart">
+              {m.revenueData.byIndustry.map((item, i) => {
+                const max = m.revenueData.byIndustry[0]?.value || 1
+                const colors = ['#3b82f6', '#6366f1', '#8b5cf6', '#0ea5e9', '#14b8a6', '#f59e0b']
+                return (
+                  <div key={item.industry} className="list-item">
+                    <div className="list-label">{item.industry}</div>
+                    <div className="list-bar-container">
+                      <div className="list-bar" style={{ width: `${(item.value / max) * 100}%`, background: colors[i % colors.length] }} />
                     </div>
-                  )
-                })}
-                <div className="legend">
-                  <span className="legend-item"><span className="dot signed"></span> Signed</span>
-                  <span className="legend-item"><span className="dot paid"></span> Paid</span>
-                </div>
-              </div>
-            ) : (
-              <p className="no-data-msg">No monthly revenue data yet. Add financials to leads to see trends.</p>
-            )}
+                    <span className="list-value">${item.value.toLocaleString()}</span>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        </section>
+        )}
 
-        <section className="chart-card wide-chart">
-          <h3>Lead Conversion Trend (Monthly)</h3>
-          <div className="trend-chart">
-            {metrics.leadsTrend.length > 0 ? (
-              <div className="bar-chart-horizontal">
-                {metrics.leadsTrend.map(item => {
-                  const maxValue = Math.max(...metrics.leadsTrend.map(m => m.newLeads))
-                  return (
-                    <div key={item.month} className="trend-row">
-                      <div className="trend-label">{item.month}</div>
-                      <div className="trend-bars">
-                        <div className="stacked-bar leads">
-                          <div
-                            className="bar-new"
-                            style={{ width: `${maxValue > 0 ? (item.newLeads / maxValue) * 100 : 0}%` }}
-                            title={`New: ${item.newLeads}`}
-                          ></div>
-                          <div
-                            className="bar-conv"
-                            style={{ width: `${maxValue > 0 ? (item.converted / maxValue) * 100 : 0}%` }}
-                            title={`Converted: ${item.converted}`}
-                          ></div>
-                        </div>
-                      </div>
-                      <div className="trend-values">
-                        <span className="new-value">{item.newLeads} new</span>
-                        <span className="conv-value">{item.converted} conv</span>
-                      </div>
-                    </div>
-                  )
-                })}
-                <div className="legend">
-                  <span className="legend-item"><span className="dot new-lead"></span> New Leads</span>
-                  <span className="legend-item"><span className="dot converted"></span> Converted</span>
+        {/* Revenue by Country */}
+        {m.revenueData.byCountry.length > 0 && (
+          <div className="chart-card">
+            <h3>Leads by Country</h3>
+            <div className="list-chart">
+              {m.revenueData.byCountry.map(item => (
+                <div key={item.country} className="country-item">
+                  <div className="country-name">{item.country}</div>
+                  <div className="country-stats">
+                    <span className="country-count">{item.count} leads</span>
+                    {item.value > 0 && <span className="country-value">${item.value.toLocaleString()}</span>}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <p className="no-data-msg">No lead data yet. Add leads to see conversion trends.</p>
-            )}
+              ))}
+            </div>
           </div>
-        </section>
+        )}
+
+        {/* Recent Activity */}
+        {m.recentActivity.length > 0 && (
+          <div className="chart-card">
+            <h3>Recent Activity</h3>
+            <div className="activity-list">
+              {m.recentActivity.map((a, i) => (
+                <div key={i} className="activity-item">
+                  <div className="activity-dot" />
+                  <div className="activity-content">
+                    <span className="activity-lead">{a.lead}</span>
+                    <span className="activity-action">{a.action}</span>
+                    <span className="activity-date">{new Date(a.date).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <style jsx>{`
-        .analytics-container {
-          display: flex;
-          flex-direction: column;
-          gap: 32px;
-        }
+        .analytics-container { min-height:calc(100vh - 120px); }
+        .analytics-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:28px; }
+        .page-title { font-size:24px; font-weight:700; color:#111; margin:0; }
+        .refresh-btn { background:#f1f5f9; border:1px solid #e2e8f0; padding:8px 16px; border-radius:10px; font-size:13px; font-weight:600; color:#475569; cursor:pointer; }
+        .refresh-btn:hover { background:#e2e8f0; }
 
-        .page-title {
-          font-size: 24px;
-          font-weight: 700;
-          color: #111;
-          margin: 0;
-        }
+        .analytics-loading { display:flex; align-items:center; justify-content:center; gap:12px; padding:80px; color:#64748b; font-size:14px; }
+        .spinner { width:20px; height:20px; border:2px solid #e2e8f0; border-top-color:#3b82f6; border-radius:50%; animation:spin 0.6s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
 
-        .top-stats {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 20px;
-        }
+        .analytics-empty { text-align:center; padding:80px 40px; }
+        .empty-icon { font-size:48px; margin-bottom:16px; }
+        .analytics-empty h2 { font-size:22px; font-weight:700; color:#1e293b; margin:0 0 8px; }
+        .analytics-empty p { color:#64748b; font-size:14px; margin:0 0 24px; }
+        .empty-hint { display:inline-flex; align-items:center; gap:8px; background:#fffbeb; border:1px solid #fef3c7; padding:12px 20px; border-radius:12px; font-size:13px; color:#92400e; }
 
-        .stat-card {
-          background: #fff;
-          padding: 24px;
-          border-radius: 12px;
-          border: 1px solid #e4e4e7;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
+        .summary-grid { display:grid; grid-template-columns:repeat(5, 1fr); gap:16px; margin-bottom:28px; }
+        .summary-card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:20px; display:flex; align-items:center; gap:16px; transition:all 0.2s; }
+        .summary-card:hover { box-shadow:0 4px 12px rgba(0,0,0,0.06); transform:translateY(-2px); }
+        .summary-card.outline-amber { border-color:#fef3c7; background:#fffbf0; }
+        .summary-card.outline-emerald { border-color:#d1fae5; background:#f2fdf7; }
+        .card-icon { width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+        .card-icon.blue { background:#eff6ff; }
+        .card-icon.green { background:#f0fdf4; }
+        .card-icon.purple { background:#faf5ff; }
+        .card-icon.amber { background:#fffbeb; }
+        .card-icon.emerald { background:#ecfdf5; }
+        .card-icon.red { background:#fef2f2; }
+        .card-icon.indigo { background:#eef2ff; }
+        .card-icon.teal { background:#f0fdfa; }
+        .card-info { display:flex; flex-direction:column; }
+        .card-value { font-size:22px; font-weight:800; color:#0f172a; line-height:1.2; }
+        .card-label { font-size:12px; color:#64748b; font-weight:500; margin-top:2px; }
 
-        .stat-card.highlight-green {
-          background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-          border-color: #86efac;
-        }
+        .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+        .chart-card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:24px; }
+        .chart-card.wide { grid-column:span 2; }
+        .chart-card h3 { font-size:14px; font-weight:700; color:#1e293b; margin:0 0 20px; }
 
-        .stat-card.highlight-green .value {
-          color: #15803d;
-        }
+        .funnel-chart { display:flex; flex-direction:column; gap:10px; }
+        .funnel-row { display:flex; align-items:center; gap:14px; }
+        .funnel-label { width:220px; flex-shrink:0; font-size:12px; font-weight:600; color:#475569; text-align:right; }
+        .funnel-bar-container { flex:1; display:flex; align-items:center; gap:10px; }
+        .funnel-bar { height:28px; border-radius:6px; min-width:4px; transition:width 0.4s ease; }
+        .funnel-value { font-size:12px; font-weight:600; color:#64748b; white-space:nowrap; }
 
-        .stat-card.highlight-red {
-          background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-          border-color: #fca5a5;
-        }
+        .bar-chart { display:flex; align-items:flex-end; gap:16px; justify-content:center; padding:20px 0; min-height:160px; }
+        .bar-group { display:flex; flex-direction:column; align-items:center; gap:8px; }
+        .bars { display:flex; gap:4px; align-items:flex-end; }
+        .bar { width:24px; border-radius:4px 4px 0 0; min-height:4px; transition:height 0.4s ease; cursor:pointer; }
+        .bar.signed { background:#3b82f6; }
+        .bar.paid { background:#10b981; }
+        .bar.new-leads { background:#6366f1; }
+        .bar.converted-leads { background:#10b981; }
+        .bar-label { font-size:10px; color:#94a3b8; font-weight:600; }
+        .chart-legend { display:flex; gap:16px; justify-content:center; margin-top:12px; }
+        .legend-item { display:flex; align-items:center; gap:6px; font-size:12px; color:#64748b; }
+        .dot { width:10px; height:10px; border-radius:3px; }
+        .dot.signed { background:#3b82f6; }
+        .dot.paid { background:#10b981; }
+        .dot.new-leads { background:#6366f1; }
+        .dot.converted-leads { background:#10b981; }
 
-        .stat-card.highlight-red .value {
-          color: #dc2626;
-        }
+        .bottom-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:20px; }
+        .list-chart { display:flex; flex-direction:column; gap:12px; }
+        .list-item { display:flex; align-items:center; gap:12px; }
+        .list-label { width:100px; font-size:12px; font-weight:500; color:#475569; flex-shrink:0; }
+        .list-bar-container { flex:1; height:24px; background:#f1f5f9; border-radius:6px; overflow:hidden; }
+        .list-bar { height:100%; border-radius:6px; min-width:4px; transition:width 0.4s ease; }
+        .list-value { font-size:12px; font-weight:700; color:#0f172a; white-space:nowrap; }
 
-        .stat-card label {
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          color: #64748b;
-          font-weight: 600;
-        }
+        .country-item { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f1f5f9; }
+        .country-item:last-child { border-bottom:none; }
+        .country-name { font-size:13px; font-weight:600; color:#334155; }
+        .country-stats { display:flex; gap:12px; }
+        .country-count { font-size:12px; color:#64748b; }
+        .country-value { font-size:12px; font-weight:700; color:#059669; }
 
-        .stat-card .value {
-          font-size: 22px;
-          font-weight: 700;
-          color: #0f172a;
-          letter-spacing: -0.02em;
-        }
-
-        .metrics-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-          gap: 24px;
-        }
-
-        .chart-card {
-          background: #fff;
-          padding: 32px;
-          border-radius: 16px;
-          border: 1px solid #e2e8f0;
-          min-height: 400px;
-        }
-
-        .chart-card h3 {
-          font-size: 16px;
-          font-weight: 600;
-          color: #334155;
-          margin-bottom: 32px;
-        }
-
-        .funnel-viz {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .funnel-stage {
-          background: #f8fafc;
-          border: 1px solid #cbd5e1;
-          padding: 12px 20px;
-          border-radius: 6px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          min-width: 200px;
-          transition: transform 0.2s;
-        }
-
-        .funnel-stage:hover {
-          transform: scale(1.02);
-          border-color: #3b82f6;
-          background: #eff6ff;
-        }
-
-        .stage-label {
-          font-size: 12px;
-          font-weight: 500;
-          color: #1e293b;
-        }
-
-        .stage-count {
-          font-size: 12px;
-          color: #3b82f6;
-          font-weight: 600;
-        }
-
-        .bar-chart {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .bar-row {
-          display: grid;
-          grid-template-columns: 100px 1fr 80px;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .bar-label {
-          font-size: 12px;
-          color: #64748b;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        .bar-container {
-          height: 12px;
-          background: #f1f5f9;
-          border-radius: 6px;
-          overflow: hidden;
-        }
-
-        .bar-fill {
-          height: 100%;
-          background: #0f172a;
-          border-radius: 6px;
-        }
-
-        .bar-value {
-          font-size: 11px;
-          font-weight: 600;
-          color: #334155;
-          text-align: right;
-        }
-
-        .loading-state, .no-data {
-          padding: 100px;
-          text-align: center;
-          color: #94a3b8;
-        }
-        
-        .no-data-msg {
-          color: #cbd5e1;
-          font-size: 13px;
-          text-align: center;
-          margin-top: 40px;
-        }
-
-        .trends-section {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 24px;
-        }
-
-        .wide-chart {
-          min-height: 300px;
-        }
-
-        .trend-chart {
-          padding-top: 16px;
-        }
-
-        .bar-chart-horizontal {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .trend-row {
-          display: grid;
-          grid-template-columns: 80px 1fr 140px;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .trend-label {
-          font-size: 12px;
-          font-weight: 600;
-          color: #64748b;
-        }
-
-        .trend-bars {
-          height: 24px;
-          position: relative;
-        }
-
-        .stacked-bar {
-          height: 100%;
-          position: relative;
-          background: #f1f5f9;
-          border-radius: 4px;
-          overflow: hidden;
-        }
-
-        .bar-signed {
-          position: absolute;
-          top: 0;
-          left: 0;
-          height: 100%;
-          background: linear-gradient(90deg, #0f172a, #334155);
-          border-radius: 4px;
-          z-index: 1;
-        }
-
-        .bar-paid {
-          position: absolute;
-          top: 0;
-          left: 0;
-          height: 100%;
-          background: linear-gradient(90deg, #22c55e, #16a34a);
-          border-radius: 4px;
-          z-index: 2;
-        }
-
-        .bar-new {
-          position: absolute;
-          top: 0;
-          left: 0;
-          height: 100%;
-          background: linear-gradient(90deg, #3b82f6, #2563eb);
-          border-radius: 4px;
-          z-index: 1;
-        }
-
-        .bar-conv {
-          position: absolute;
-          top: 0;
-          left: 0;
-          height: 100%;
-          background: linear-gradient(90deg, #f59e0b, #d97706);
-          border-radius: 4px;
-          z-index: 2;
-        }
-
-        .trend-values {
-          display: flex;
-          gap: 12px;
-          font-size: 11px;
-          font-weight: 600;
-        }
-
-        .signed-value { color: #0f172a; }
-        .paid-value { color: #22c55e; }
-        .new-value { color: #3b82f6; }
-        .conv-value { color: #f59e0b; }
-
-        .legend {
-          display: flex;
-          gap: 24px;
-          margin-top: 16px;
-          padding-top: 16px;
-          border-top: 1px solid #e2e8f0;
-        }
-
-        .legend-item {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 12px;
-          color: #64748b;
-        }
-
-        .dot {
-          width: 12px;
-          height: 12px;
-          border-radius: 3px;
-        }
-
-        .dot.signed { background: #0f172a; }
-        .dot.paid { background: #22c55e; }
-        .dot.new-lead { background: #3b82f6; }
-        .dot.converted { background: #f59e0b; }
+        .activity-list { display:flex; flex-direction:column; gap:0; }
+        .activity-item { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid #f1f5f9; }
+        .activity-item:last-child { border-bottom:none; }
+        .activity-dot { width:8px; height:8px; border-radius:50%; background:#3b82f6; flex-shrink:0; margin-top:5px; }
+        .activity-content { display:flex; flex-direction:column; }
+        .activity-lead { font-size:13px; font-weight:600; color:#1e293b; }
+        .activity-action { font-size:12px; color:#64748b; }
+        .activity-date { font-size:11px; color:#94a3b8; }
       `}</style>
     </div>
   )

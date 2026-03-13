@@ -7,10 +7,18 @@ import { PROJECT_TYPES } from '@/lib/types'
 import CalendlyWidget from '@/components/CalendlyWidget'
 
 export default function Hero() {
+  const COUNTRIES = [
+    { name: 'Canada', code: 'CA', prefix: '+1' },
+    { name: 'United States', code: 'US', prefix: '+1' },
+    { name: 'United Kingdom', code: 'GB', prefix: '+44' },
+  ]
+
   const [formState, setFormState] = useState({
     name: '',
     email: '',
+    phone: '',
     company: '',
+    website: '',
     country: 'Canada',
     project_type: '',
     estimated_start_time: '',
@@ -20,12 +28,26 @@ export default function Hero() {
   const [submitted, setSubmitted] = useState(false)
   const [consultationId, setConsultationId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [countrySearch, setCountrySearch] = useState('Canada')
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false)
+
+  const filteredCountries = countrySearch.toLowerCase() === formState.country.toLowerCase() 
+    ? COUNTRIES 
+    : COUNTRIES.filter(c => c.name.toLowerCase().includes(countrySearch.toLowerCase()))
+
+  const selectedCountry = COUNTRIES.find(c => c.name === formState.country) || COUNTRIES[0]
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormState(prev => ({
       ...prev,
       [e.target.name]: e.target.value
     }))
+  }
+
+  const handleCountrySelect = (countryName: string) => {
+    setFormState(prev => ({ ...prev, country: countryName }))
+    setCountrySearch(countryName)
+    setShowCountryDropdown(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,10 +58,17 @@ export default function Hero() {
     try {
       const supabase = createClient()
       const { data, error: submitError } = await supabase
-        .from('consultations')
-        .insert([formState])
-        .select('id')
-        .single()
+        .rpc('submit_consultation', {
+          p_name: formState.name,
+          p_email: formState.email,
+          p_phone: `${selectedCountry.prefix} ${formState.phone}`.trim(),
+          p_company: formState.company,
+          p_website: formState.website,
+          p_country: formState.country,
+          p_project_type: formState.project_type,
+          p_estimated_start_time: formState.estimated_start_time,
+          p_description: formState.description
+        })
 
       if (submitError) {
         console.error('Supabase error submitting consultation:', submitError)
@@ -48,7 +77,7 @@ export default function Hero() {
       }
 
       if (data) {
-        setConsultationId(data.id)
+        setConsultationId(data)
       }
       setSubmitted(true)
     } catch (err: unknown) {
@@ -72,8 +101,6 @@ export default function Hero() {
 
       if (updateError) {
         console.error('Error updating consultation status:', updateError)
-      } else {
-        console.log('Consultation status updated to scheduled successfully')
       }
     } catch (err: unknown) {
       console.error('Unexpected error updating status:', err)
@@ -151,17 +178,56 @@ export default function Hero() {
                   </div>
 
                   <div className="form-grid">
-                    <div className="form-group">
-                      <input
-                        type="text"
-                        name="country"
-                        placeholder="Country"
-                        className="form-input"
-                        value={formState.country}
-                        onChange={handleChange}
-                        required
-                      />
+                    <div className="form-group country-field">
+                      <div className="search-select">
+                        <input 
+                          type="text" 
+                          value={countrySearch} 
+                          className="form-input"
+                          onChange={(e) => {
+                            setCountrySearch(e.target.value)
+                            setShowCountryDropdown(true)
+                          }}
+                          onFocus={() => setShowCountryDropdown(true)}
+                          onBlur={() => setTimeout(() => setShowCountryDropdown(false), 200)}
+                          placeholder="Country"
+                        />
+                        {showCountryDropdown && (
+                          <div className="dropdown">
+                            {filteredCountries.map(c => (
+                              <div 
+                                key={c.code} 
+                                className={`dropdown-item ${formState.country === c.name ? 'selected' : ''}`}
+                                onClick={() => handleCountrySelect(c.name)}
+                              >
+                                <span>{c.name}</span>
+                                {formState.country === c.name && <span className="check">✓</span>}
+                              </div>
+                            ))}
+                            {filteredCountries.length === 0 && (
+                              <div className="dropdown-no-results">No results</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
+                    <div className="form-group">
+                      <div className="phone-input-group">
+                        <span className="prefix">{selectedCountry.prefix}</span>
+                        <input 
+                          type="tel" 
+                          name="phone" 
+                          className="form-input phone-no-border"
+                          value={formState.phone} 
+                          onChange={handleChange} 
+                          required 
+                          placeholder="Phone Number" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-grid">
                     <div className="form-group">
                       <input
                         type="text"
@@ -169,6 +235,16 @@ export default function Hero() {
                         placeholder="Company (Optional)"
                         className="form-input"
                         value={formState.company}
+                        onChange={handleChange}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <input
+                        type="url"
+                        name="website"
+                        placeholder="Website (Optional)"
+                        className="form-input"
+                        value={formState.website}
                         onChange={handleChange}
                       />
                     </div>
@@ -212,7 +288,7 @@ export default function Hero() {
                       name="description"
                       placeholder="Briefly describe your project..."
                       className="form-textarea"
-                      rows={3}
+                      rows={2}
                       value={formState.description}
                       onChange={handleChange}
                       required
@@ -344,8 +420,9 @@ export default function Hero() {
           border-radius: 24px;
           padding: 40px;
           box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.08);
-          max-width: 480px;
+          max-width: 520px;
           margin-left: auto;
+          transition: all 0.3s ease;
         }
 
         .form-header {
@@ -372,6 +449,41 @@ export default function Hero() {
         .form-group {
           margin-bottom: 12px;
         }
+
+        .country-field { position: relative; }
+        .search-select { position: relative; }
+        .dropdown { 
+          position: absolute; top: 100%; left: 0; right: 0; background: #fff; 
+          border: 1px solid #E5E7EB; border-radius: 12px; margin-top: 4px; 
+          max-height: 150px; overflow-y: auto; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .dropdown-item { 
+          padding: 8px 12px; cursor: pointer; font-size: 13px; color: #374151;
+          display: flex; justify-content: space-between; align-items: center;
+          text-align: left;
+        }
+        .dropdown-item:hover { background: #F3F4F6; }
+        .dropdown-item.selected { background: rgba(37, 99, 235, 0.05); color: #2563EB; font-weight: 600; }
+        .check { font-size: 12px; }
+        .dropdown-no-results { padding: 8px 12px; font-size: 13px; color: #9CA3AF; }
+
+        .phone-input-group { 
+          display: flex; 
+          align-items: center; 
+          background: #fff; 
+          border: 1px solid #e5e7eb; 
+          border-radius: 12px;
+          transition: all 0.2s;
+        }
+        .phone-input-group .prefix { 
+          padding: 0 12px; 
+          font-size: 14px; 
+          font-weight: 600; 
+          color: #6B7280; 
+          border-right: 1px solid #E5E7EB; 
+        }
+        .phone-no-border { border: none !important; box-shadow: none !important; }
+        .phone-input-group:focus-within { border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
 
         .form-input, .form-select, .form-textarea {
           width: 100%;
@@ -462,6 +574,8 @@ export default function Hero() {
 
           .booking-card {
             margin: 0 auto;
+            max-width: 640px; /* Widened for tablet */
+            width: 100%;
           }
         }
 
@@ -480,6 +594,11 @@ export default function Hero() {
 
           .booking-card {
             padding: 24px;
+          }
+
+          .form-grid {
+            grid-template-columns: 1fr;
+            gap: 0;
           }
         }
       `}</style>

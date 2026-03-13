@@ -2,71 +2,63 @@
 
 import { notFound, useParams } from 'next/navigation'
 import Link from 'next/link'
-
-// Case study data
-const caseStudiesData: Record<string, {
-  title: string
-  summary: string
-  industry: string
-  challenge: string
-  solution: string
-  process: string[]
-  outcome: string
-  stats: { value: string; label: string }[]
-}> = {
-  'atelier-ai': {
-    title: 'Atelier AI',
-    summary: 'A SaaS platform that helps fashion designers go from idea to visualization to production in minutes.',
-    industry: 'Fashion Tech',
-    challenge: 'Fashion design is typically a slow, fragmented process involving manual sketching, expensive sampling, and complex supply chains. Designers needed a way to accelerate the "idea-to-product" lifecycle without sacrificing creative control or quality.',
-    solution: 'We built a comprehensive AI-powered platform that generates photorealistic visualizations from rough sketches, automatically creates production-ready tech packs, and connects directly with a vetted network of manufacturers. The system uses generative AI to visualize fabrics and drapes in real-time.',
-    process: ['Designer workflow analysis', 'Generative AI model integration', '3D visualization engine', 'Tech pack automation', 'Supply chain API integration', 'Beta launch'],
-    outcome: 'Reduced design-to-sample time by 80%. Adopted by 150+ independent fashion labels in the first 6 months. Platform facilitated over $2M in production volume.',
-    stats: [
-      { value: '80%', label: 'Faster Time-to-Market' },
-      { value: '150+', label: 'Design Labels' },
-      { value: '$2M+', label: 'Production Volume' },
-    ],
-  },
-  'glarrie-herbal': {
-    title: 'Glarrie Herbal',
-    summary: 'A premium e-commerce store for herbal skincare products made with African botanicals.',
-    industry: 'Beauty & Skincare',
-    challenge: "Glarrie Herbal needed an online store that could effectively communicate the natural, botanical origins of their skincare products while building trust with customers seeking visible results. They required a platform that could handle consultations, product education, and seamless purchasing for their stretch marks and skincare range.",
-    solution: "We designed and developed a warm, inviting e-commerce experience that puts product efficacy front and center. The platform features detailed product pages with ingredient transparency, before/after results galleries, integrated consultation booking, real-time order tracking, and a mobile-first checkout optimized for their Nigerian customer base.",
-    process: ['Brand & audience research', 'E-commerce UX design', 'Visual identity refinement', 'Next.js development', 'Payment & shipping integration', 'Launch & optimization'],
-    outcome: 'Achieved 2,000+ happy customers with a 4.9/5 average rating. Consultation bookings increased by 150%. Mobile conversion rate improved by 65% compared to their previous platform.',
-    stats: [
-      { value: '2,000+', label: 'Happy Customers' },
-      { value: '4.9/5', label: 'Customer Rating' },
-      { value: '150%', label: 'More Consultations' },
-    ],
-  },
-  'fintech-dashboard': {
-    title: 'FinFlow Dashboard',
-    summary: 'Real-time financial analytics dashboard for institutional investors.',
-    industry: 'Finance',
-    challenge: "FinFlow required a high-performance dashboard capable of processing and visualizing millions of data points in real-time. Their existing tools were slow, outdated, and couldn't handle the volume of data their analysts needed.",
-    solution: 'We engineered a responsive dashboard with WebSocket connections for live data, advanced charting with D3.js, and customizable data views. The architecture was optimized for performance at every layer.',
-    process: ['Technical requirements', 'Architecture design', 'Frontend development', 'API integration', 'Performance optimization', 'Security audit'],
-    outcome: 'Handles 10M+ data points with sub-second render times. Reduced analyst workflow time by 60%. Successfully passed SOC 2 compliance audit.',
-    stats: [
-      { value: '10M+', label: 'Data Points' },
-      { value: '<1s', label: 'Render Time' },
-      { value: '60%', label: 'Time Saved' },
-    ],
-  },
-}
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { CaseStudy } from '@/lib/types'
 
 export default function CaseStudyPage() {
   const params = useParams()
   const slug = params.slug as string
+  const [caseStudy, setCaseStudy] = useState<CaseStudy | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const supabase = createClient()
 
-  const caseStudy = caseStudiesData[slug]
+  useEffect(() => {
+    async function fetchCaseStudy() {
+      if (!slug) return
+      
+      setIsLoading(true)
+      let decodedSlug = slug
+      try {
+        // Handle potential multiple encodings
+        while (decodedSlug.includes('%')) {
+          decodedSlug = decodeURIComponent(decodedSlug)
+        }
+      } catch (e) {
+        console.warn('Error decoding slug:', e)
+      }
+      
+      const { data, error } = await supabase
+        .from('case_studies')
+        .select('id, title, summary, industry, challenge, solution, process, images, outcome, published, slug, featured, created_at, updated_at')
+        .eq('slug', decodedSlug)
+        .eq('published', true)
+        .maybeSingle()
+
+      if (error) {
+        console.error('Error fetching case study:', error)
+      } else if (!data) {
+        console.warn(`Case study not found for slug: ${decodedSlug}`)
+      } else {
+        setCaseStudy(data)
+      }
+      setIsLoading(false)
+    }
+
+    fetchCaseStudy()
+  }, [slug, supabase])
+
+  if (isLoading) {
+    return <div className="loading-state">Loading project...</div>
+  }
 
   if (!caseStudy) {
     notFound()
   }
+
+  // Ensure arrays exist
+  const processSteps = Array.isArray(caseStudy.process) ? caseStudy.process : []
+  const projectImages = Array.isArray(caseStudy.images) ? caseStudy.images : []
 
   return (
     <div className="case-study-page">
@@ -81,37 +73,38 @@ export default function CaseStudyPage() {
           </Link>
 
           <div className="hero-content">
-            <span className="industry-tag">{caseStudy.industry}</span>
+            <span className="industry-tag">{caseStudy.industry || 'Project'}</span>
             <h1>{caseStudy.title}</h1>
             <p className="hero-summary">{caseStudy.summary}</p>
           </div>
         </div>
       </section>
 
-      {/* Project Image Placeholder */}
-      <section className="project-showcase">
-        <div className="container">
-          <div className="showcase-image">
-            <div className="image-placeholder">
-              <span>{caseStudy.title.charAt(0)}</span>
+      {/* Project Images */}
+      {projectImages.length > 0 ? (
+        <section className="project-showcase">
+          <div className="container">
+            <div className="showcase-grid">
+              {projectImages.map((img, idx) => (
+                <div key={idx} className="showcase-image">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img} alt={`${caseStudy.title} - showcase ${idx + 1}`} style={{ width: '100%', height: 'auto' }} />
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* Stats Bar */}
-      <section className="stats-section">
-        <div className="container">
-          <div className="stats-grid">
-            {caseStudy.stats.map((stat, index) => (
-              <div key={index} className="stat-item">
-                <span className="stat-value">{stat.value}</span>
-                <span className="stat-label">{stat.label}</span>
+        </section>
+      ) : (
+        <section className="project-showcase">
+          <div className="container">
+            <div className="showcase-image">
+              <div className="image-placeholder">
+                <span>{caseStudy.title.charAt(0)}</span>
               </div>
-            ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Content Sections */}
       <section className="content-section">
@@ -139,28 +132,30 @@ export default function CaseStudyPage() {
       </section>
 
       {/* Process Section */}
-      <section className="process-section">
-        <div className="container">
-          <div className="process-header">
-            <span className="block-number">03</span>
-            <h2>The Process</h2>
-          </div>
-          <div className="process-timeline">
-            {caseStudy.process.map((step, index) => (
-              <div key={index} className="process-step">
-                <div className="step-indicator">
-                  <span className="step-dot"></span>
-                  {index < caseStudy.process.length - 1 && <span className="step-line"></span>}
+      {processSteps.length > 0 && (
+        <section className="process-section">
+          <div className="container">
+            <div className="process-header">
+              <span className="block-number">03</span>
+              <h2>The Process</h2>
+            </div>
+            <div className="process-timeline">
+              {processSteps.map((step, index) => (
+                <div key={index} className="process-step">
+                  <div className="step-indicator">
+                    <span className="step-dot"></span>
+                    {index < processSteps.length - 1 && <span className="step-line"></span>}
+                  </div>
+                  <div className="step-content">
+                    <span className="step-number">Step {index + 1}</span>
+                    <p>{step}</p>
+                  </div>
                 </div>
-                <div className="step-content">
-                  <span className="step-number">Step {index + 1}</span>
-                  <p>{step}</p>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Outcome Section */}
       <section className="outcome-section">
@@ -180,7 +175,7 @@ export default function CaseStudyPage() {
         <div className="container">
           <div className="cta-content">
             <h2>Have a similar project in mind?</h2>
-            <p>Let's discuss how we can help you achieve similar results.</p>
+            <p>Let&apos;s discuss how we can help you achieve similar results.</p>
             <Link href="/book-consultation" className="btn btn-primary">
               Start a Conversation
             </Link>
@@ -191,6 +186,15 @@ export default function CaseStudyPage() {
       <style jsx>{`
         .case-study-page {
           padding-top: 72px;
+        }
+
+        .loading-state {
+          height: 80vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 18px;
+          color: #666;
         }
 
         /* Hero Section */
@@ -253,10 +257,22 @@ export default function CaseStudyPage() {
           background: linear-gradient(180deg, #F8F9FA 0%, #FFFFFF 100%);
         }
 
+        .showcase-grid {
+           display: flex;
+           flex-direction: column;
+           gap: 40px;
+        }
+
         .showcase-image {
           border-radius: 16px;
           overflow: hidden;
           box-shadow: 0 24px 80px rgba(0, 0, 0, 0.08);
+        }
+
+        .showcase-image img {
+          width: 100%;
+          height: auto;
+          display: block;
         }
 
         .image-placeholder {
@@ -271,40 +287,6 @@ export default function CaseStudyPage() {
           font-size: 120px;
           font-weight: 700;
           color: rgba(0, 0, 0, 0.08);
-        }
-
-        /* Stats Section */
-        .stats-section {
-          padding: 64px 0;
-          background-color: var(--color-text-primary);
-        }
-
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 48px;
-          text-align: center;
-        }
-
-        .stat-item {
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .stat-value {
-          font-size: 48px;
-          font-weight: 600;
-          color: #FFFFFF;
-          letter-spacing: -0.02em;
-        }
-
-        .stat-label {
-          font-size: 14px;
-          font-weight: 500;
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          color: rgba(255, 255, 255, 0.6);
         }
 
         /* Content Sections */
@@ -488,14 +470,6 @@ export default function CaseStudyPage() {
             grid-template-columns: 1fr;
             gap: 32px;
           }
-
-          .stats-grid {
-            gap: 32px;
-          }
-
-          .stat-value {
-            font-size: 36px;
-          }
         }
 
         @media (max-width: 768px) {
@@ -509,15 +483,6 @@ export default function CaseStudyPage() {
 
           .hero-summary {
             font-size: 18px;
-          }
-
-          .stats-grid {
-            grid-template-columns: 1fr;
-            gap: 24px;
-          }
-
-          .stat-value {
-            font-size: 40px;
           }
 
           .content-section,
