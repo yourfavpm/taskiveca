@@ -8,7 +8,7 @@ import SelectedWork from "@/components/sections/SelectedWork";
 import WhyTaskive from "@/components/sections/WhyTaskive";
 import Testimonials from "@/components/sections/Testimonials";
 import IndustryScroll from "@/components/sections/IndustryScroll";
-import Pricing from "@/components/sections/Pricing";
+
 import FinalCTA from "@/components/sections/FinalCTA";
 
 export default function Home() {
@@ -24,7 +24,7 @@ export default function Home() {
       <WhyTaskive />
       <Testimonials />
       <IndustryScroll />
-      <Pricing />
+
       <FinalCTA />
     </>
   );

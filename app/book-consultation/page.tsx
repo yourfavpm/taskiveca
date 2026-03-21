@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PROJECT_TYPES } from '@/lib/types'
 import CalendlyWidget from '@/components/CalendlyWidget'
@@ -30,6 +30,12 @@ export default function BookConsultation() {
   const [error, setError] = useState('')
   const [countrySearch, setCountrySearch] = useState('Canada')
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
+
+  useEffect(() => {
+    if (submitted) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [submitted])
 
   // Filter countries only if search is NOT matching the current selection exactly
   const filteredCountries = countrySearch.toLowerCase() === formState.country.toLowerCase() 

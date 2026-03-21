@@ -77,12 +77,12 @@ export default function SettingsForm({ settings, onSave }: SettingsFormProps) {
                     <h3>Social Media</h3>
 
                     <div className="form-group">
-                        <label>TikTok URL</label>
+                        <label>Facebook URL</label>
                         <input
                             type="url"
                             value={formData.social_tiktok || ''}
                             onChange={(e) => handleChange('social_tiktok', e.target.value)}
-                            placeholder="https://tiktok.com/@..."
+                            placeholder="https://facebook.com/..."
                         />
                     </div>
 

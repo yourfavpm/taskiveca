@@ -65,10 +65,11 @@ export default function Testimonials() {
                 if (error.name === 'AbortError') return
 
                 console.error('Testimonials fetch error:', {
-                    message: error.message,
-                    details: error.details,
-                    hint: error.hint,
-                    code: error.code
+                    message: error.message || 'No message',
+                    details: error.details || 'No details',
+                    hint: error.hint || 'No hint',
+                    code: error.code || 'No code',
+                    fullError: error
                 })
                 setTestimonials(fallbackTestimonials)
             } finally {

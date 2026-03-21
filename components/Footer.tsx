@@ -51,7 +51,7 @@ export default function Footer() {
     company: [
       { href: '/#work', label: 'Our Work' },
       { href: '/#how-we-work', label: 'Process' },
-      { href: '/#pricing', label: 'Pricing' },
+      { href: '/pricing', label: 'Pricing' },
       { href: '/book-consultation', label: 'Contact' },
     ],
   }
@@ -84,7 +84,7 @@ export default function Footer() {
 
                 <div className="social-links">
                   {companySettings.social_tiktok && (
-                    <a href={companySettings.social_tiktok} target="_blank" rel="noopener noreferrer">TikTok</a>
+                    <a href={companySettings.social_tiktok} target="_blank" rel="noopener noreferrer">Facebook</a>
                   )}
                   {companySettings.social_instagram && (
                     <a href={companySettings.social_instagram} target="_blank" rel="noopener noreferrer">Instagram</a>
